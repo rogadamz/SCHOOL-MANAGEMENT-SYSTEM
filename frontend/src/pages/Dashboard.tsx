@@ -7,8 +7,6 @@ import { GradeDistribution } from '@/components/dashboard/charts/GradeDistributi
 import { AttendanceChart } from '@/components/dashboard/charts/AttendanceChart';
 import { Students } from '@/pages/Students';
 import { Attendance } from '@/pages/Attendance';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { 
   Users, UserRound, GraduationCap, BookOpen, 
   Calculator, MessageSquare, Mail, Calendar
@@ -38,11 +36,6 @@ export const Dashboard = () => {
   const [chartGradeData, setChartGradeData] = useState(sampleGradeData);
   const [chartAttendanceData, setChartAttendanceData] = useState(sampleAttendanceData);
   const [loading, setLoading] = useState(false);
-  const [currentViewMonth, setCurrentViewMonth] = useState(currentDate.getMonth());
-  const [currentViewYear, setCurrentViewYear] = useState(currentDate.getFullYear());
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [dateAttendance, setDateAttendance] = useState<{ present: number, total: number }>({ present: 0, total: 0 });
-
 
   const currentDate = new Date();
   const currentMonth = currentDate.toLocaleString('default', { month: 'long' });
@@ -352,140 +345,32 @@ export const Dashboard = () => {
 
   // Render a simple calendar
   const renderCalendar = () => {
-    // Get days information for the currently viewed month
-    const firstDay = new Date(currentViewYear, currentViewMonth, 1).getDay();
-    const daysInMonth = new Date(currentViewYear, currentViewMonth + 1, 0).getDate();
-    const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
-    // Adjust first day to start from Sunday (0)
-    const adjustedFirstDay = firstDay;
-    
-    // Build calendar days
-    const days = [];
-    
-    // Add empty cells for days before the 1st of the month
-    for (let i = 0; i < adjustedFirstDay; i++) {
-      days.push(<div key={`empty-${i}`} className="text-center py-2 text-gray-400"></div>);
-    }
-    
-    // Add days of the month
-    for (let i = 1; i <= daysInMonth; i++) {
-      const dayDate = new Date(currentViewYear, currentViewMonth, i);
-      const isToday = dayDate.toDateString() === new Date().toDateString();
-      const isSelected = dayDate.toDateString() === selectedDate.toDateString();
-      
-      days.push(
-        <div 
-          key={`day-${i}`} 
-          className={`text-center py-2 cursor-pointer border rounded
-            ${isSelected ? 'bg-blue-500 text-white' : ''}
-            ${isToday && !isSelected ? 'bg-blue-100 font-bold' : ''}
-            hover:bg-gray-100
-          `}
-          onClick={() => {
-            setSelectedDate(dayDate);
-            fetchDateAttendance(dayDate);
-          }}
-        >
-          {i}
-        </div>
-      );
-    }
+    // Generate a simple calendar (current month only)
+    const daysInMonth = new Date(currentYear, currentDate.getMonth() + 1, 0).getDate();
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     
     return (
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex justify-between items-center mb-4">
-          <Button 
-            variant="outline"
-            size="sm"
-            onClick={previousMonth}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <h3 className="text-lg font-semibold">
-            {new Date(currentViewYear, currentViewMonth).toLocaleString('default', { month: 'long' })} {currentViewYear}
-          </h3>
-          <Button 
-            variant="outline"
-            size="sm"
-            onClick={nextMonth}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <h3 className="text-lg font-semibold">{currentMonth} {currentYear}</h3>
+          <div className="text-sm text-gray-500">Today</div>
         </div>
         <div className="grid grid-cols-7 gap-1">
           {weekdays.map(day => (
-            <div key={day} className="text-center font-medium text-gray-600 text-sm">{day}</div>
+            <div key={day} className="text-center font-medium text-gray-600">{day}</div>
           ))}
-          {days}
-        </div>
-        
-        {/* Add selected date attendance info */}
-        <div className="mt-4 pt-4 border-t">
-          <p className="text-center font-medium">
-            {selectedDate.toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </p>
-          <p className="text-center mt-2">
-            Attendance: {dateAttendance.present}/{dateAttendance.total} 
-            {dateAttendance.total > 0 && (
-              <span className="ml-2 text-sm">
-                ({Math.round((dateAttendance.present / dateAttendance.total) * 100)}%)
-              </span>
-            )}
-          </p>
+          {Array.from({ length: daysInMonth }).map((_, i) => (
+            <div 
+              key={`day-${i+1}`} 
+              className={`text-center py-1 ${currentDate.getDate() === i+1 ? 'bg-blue-100 font-bold' : ''}`}
+            >
+              {i+1}
+            </div>
+          ))}
         </div>
       </div>
     );
   };
-
-  // Add navigation functions for the calendar
-const previousMonth = () => {
-  if (currentViewMonth === 0) {
-    setCurrentViewMonth(11);
-    setCurrentViewYear(currentViewYear - 1);
-  } else {
-    setCurrentViewMonth(currentViewMonth - 1);
-  }
-};
-
-const nextMonth = () => {
-  if (currentViewMonth === 11) {
-    setCurrentViewMonth(0);
-    setCurrentViewYear(currentViewYear + 1);
-  } else {
-    setCurrentViewMonth(currentViewMonth + 1);
-  }
-};
-
-// Add a function to fetch attendance for a specific date
-const fetchDateAttendance = async (date: Date) => {
-  const token = localStorage.getItem('token');
-  if (!token) return;
-  
-  const dateStr = date.toISOString().split('T')[0];
-  try {
-    const response = await fetch(`http://localhost:8000/analytics/attendance-summary?date=${dateStr}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      setDateAttendance({
-        present: data.present_count,
-        total: data.total_count
-      });
-    }
-  } catch (error) {
-    console.error("Error fetching date attendance:", error);
-  }
-};
 
   return (
     <div className="flex h-screen">
