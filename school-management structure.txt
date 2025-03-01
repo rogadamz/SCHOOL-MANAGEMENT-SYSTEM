@@ -1,0 +1,66 @@
+school-management/
+├── backend/
+│   ├── app/
+│   │   ├── models/
+│   │   │   ├── user.py
+│   │   │   ├── student.py
+│   │   │   └── grade.py
+│   │   ├── routers/
+│   │   │   ├── auth.py
+│   │   │   ├── students.py
+│   │   │   ├── teachers.py
+│   │   │   └── analytics.py
+│   │   ├── services/
+│   │   │   └── database.py
+│   │   ├── utils/
+│   │   │   ├── auth_utils.py
+│   │   │   └── helpers.py
+│   │   └── main.py
+│   ├── venv/
+│   ├── .env
+│   ├── config.py
+│   ├── create_test_users.py
+│   └── requirements.txt
+├── frontend/
+│   ├── node_modules/
+│   ├── public/
+│   │   └── logo.png
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── auth/
+│   │   │   │   ├── LoginForm.tsx
+│   │   │   │   └── ProtectedRoute.tsx
+│   │   │   ├── dashboard/
+│   │   │   │   ├── Header.tsx
+│   │   │   │   ├── Sidebar.tsx
+│   │   │   │   └── charts/
+│   │   │   │       ├── AttendanceChart.tsx
+│   │   │   │       ├── GradeDistribution.tsx
+│   │   │   │       └── PerformanceGraph.tsx
+│   │   │   └── ui/
+│   │   │       ├── button.tsx
+│   │   │       ├── card.tsx
+│   │   │       └── input.tsx
+│   │   ├── lib/
+│   │   │   └── utils.ts
+│   │   ├── pages/
+│   │   │   ├── Dashboard.tsx
+│   │   │   ├── Reports.tsx
+│   │   │   └── Login.tsx
+│   │   ├── utils/
+│   │   │   └── auth.ts
+│   │   ├── App.tsx
+│   │   ├── index.css
+│   │   └── main.tsx
+│   ├── .gitignore
+│   ├── index.html
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── tailwind.config.js
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts
+├── create_test_users.bat
+├── setup_db.bat
+├── run_backend.bat
+└── README.md
