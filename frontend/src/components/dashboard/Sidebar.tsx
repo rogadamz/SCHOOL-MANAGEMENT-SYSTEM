@@ -1,3 +1,4 @@
+// src/components/dashboard/Sidebar.tsx
 import { Link, useLocation } from 'react-router-dom'
 import { cn } from "@/lib/utils"
 import {
@@ -5,28 +6,74 @@ import {
   Users,
   Calendar,
   Settings,
+  GraduationCap,
+  DollarSign,
+  Award,
+  UserRound,
+  BookOpen,
+  School
 } from 'lucide-react'
 
 const sidebarItems = [
   {
     title: "Dashboard",
     href: "/dashboard",
-    icon: BarChart
+    icon: BarChart,
+    description: "Overview and summary statistics"
   },
   {
     title: "Students",
     href: "/dashboard/students",
-    icon: Users
+    icon: Users,
+    description: "Manage student information"
+  },
+  {
+    title: "Teachers",
+    href: "/dashboard/teachers",
+    icon: GraduationCap,
+    description: "Manage teaching staff"
+  },
+  {
+    title: "Parents",
+    href: "/dashboard/parents",
+    icon: UserRound,
+    description: "Manage parent information"
   },
   {
     title: "Attendance",
     href: "/dashboard/attendance",
-    icon: Calendar
+    icon: Calendar,
+    description: "Track daily attendance"
+  },
+  {
+    title: "Fees",
+    href: "/dashboard/fees",
+    icon: DollarSign,
+    description: "Manage tuition and payments"
+  },
+  {
+    title: "Grades",
+    href: "/dashboard/grades",
+    icon: Award,
+    description: "Student assessment and reports"
+  },
+  {
+    title: "Classes",
+    href: "/dashboard/classes",
+    icon: BookOpen,
+    description: "Manage class sections"
+  },
+  {
+    title: "School",
+    href: "/dashboard/school",
+    icon: School,
+    description: "School settings and information"
   },
   {
     title: "Settings",
     href: "/dashboard/settings",
-    icon: Settings
+    icon: Settings,
+    description: "System configuration"
   }
 ]
 
@@ -34,21 +81,29 @@ export const Sidebar = () => {
   const location = useLocation()
 
   return (
-    <div className="pb-12 min-h-screen w-60 border-r">
+    <div className="pb-12 min-h-screen w-64 border-r bg-gray-50">
       <div className="space-y-4 py-4">
         <div className="px-3 py-2">
-          <h2 className="mb-2 px-4 text-lg font-semibold">
-            School Management
-          </h2>
+          <div className="flex items-center px-3 py-3 mb-4">
+            <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center mr-2">
+              <School className="h-5 w-5 text-white" />
+            </div>
+            <h2 className="text-lg font-semibold">
+              Downtown Nursery
+            </h2>
+          </div>
           <div className="space-y-1">
             {sidebarItems.map((item) => (
               <Link
                 key={item.href}
                 to={item.href}
                 className={cn(
-                  "flex items-center rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent hover:text-accent-foreground",
-                  location.pathname === item.href ? "bg-accent" : "transparent"
+                  "flex items-center rounded-lg px-3 py-2 text-sm transition-colors hover:bg-blue-100 hover:text-blue-600",
+                  location.pathname === item.href 
+                    ? "bg-blue-100 text-blue-600" 
+                    : "text-gray-700"
                 )}
+                title={item.description}
               >
                 <item.icon className="mr-2 h-4 w-4" />
                 {item.title}

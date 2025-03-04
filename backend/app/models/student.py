@@ -1,3 +1,4 @@
+from .fee import Fee  # Add this import at the top
 from sqlalchemy import Column, Integer, String, Date, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from .user import Base

@@ -1,8 +1,7 @@
+# backend/app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine
-from .routers import attendance
-from .routers import fees
 import sys
 import os
 
@@ -14,9 +13,19 @@ from config import DATABASE_URL
 from .models.user import Base
 from .models.student import Student, Class, Teacher
 from .models.grade import Grade, Attendance
+from .models.fee import Fee
+# Import new models
+from .models.timetable import TimeSlot
+from .models.event import Event
+from .models.message import Message
+from .models.report_card import ReportCard, GradeSummary
+from .models.learning_material import LearningMaterial, ClassMaterial
 
 # Import routers
-from .routers import auth, students, analytics
+from .routers import auth, students, analytics, fees, attendance
+# Import new routers
+from .routers import teachers, classes, dashboard, financial
+from .routers import events, messages, report_cards, materials
 
 # Create database tables
 engine = create_engine(DATABASE_URL)
@@ -43,6 +52,16 @@ app.include_router(students.router)
 app.include_router(analytics.router)
 app.include_router(fees.router)
 app.include_router(attendance.router)
+
+# Include new routers
+app.include_router(teachers.router)
+app.include_router(classes.router)
+app.include_router(dashboard.router)
+app.include_router(financial.router)
+app.include_router(events.router)
+app.include_router(messages.router)
+app.include_router(report_cards.router)
+app.include_router(materials.router)
 
 @app.get("/")
 def read_root():
