@@ -1,5 +1,4 @@
-# backend/app/routers/classes.py - Class management endpoints
-
+# backend/app/routers/classes.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional

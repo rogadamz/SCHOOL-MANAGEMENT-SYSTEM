@@ -14,18 +14,19 @@ from .models.user import Base
 from .models.student import Student, Class, Teacher
 from .models.grade import Grade, Attendance
 from .models.fee import Fee
-# Import new models
-from .models.timetable import TimeSlot
-from .models.event import Event
-from .models.message import Message
-from .models.report_card import ReportCard, GradeSummary
-from .models.learning_material import LearningMaterial, ClassMaterial
+# Import all models from timetable.py (they're all defined in this file)
+from .models.timetable import TimeSlot, Event, Message, ReportCard, GradeSummary, LearningMaterial, ClassMaterial
 
 # Import routers
 from .routers import auth, students, analytics, fees, attendance
 # Import new routers
 from .routers import teachers, classes, dashboard, financial
-from .routers import events, messages, report_cards, materials
+# Conditionally import other routers if they exist
+try:
+    from .routers import events, messages, report_cards, materials
+    has_additional_routers = True
+except ImportError:
+    has_additional_routers = False
 
 # Create database tables
 engine = create_engine(DATABASE_URL)
@@ -58,10 +59,13 @@ app.include_router(teachers.router)
 app.include_router(classes.router)
 app.include_router(dashboard.router)
 app.include_router(financial.router)
-app.include_router(events.router)
-app.include_router(messages.router)
-app.include_router(report_cards.router)
-app.include_router(materials.router)
+
+# Include additional routers if they exist
+if has_additional_routers:
+    app.include_router(events.router)
+    app.include_router(messages.router)
+    app.include_router(report_cards.router)
+    app.include_router(materials.router)
 
 @app.get("/")
 def read_root():

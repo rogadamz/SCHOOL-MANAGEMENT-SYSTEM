@@ -8,16 +8,13 @@ from datetime import date, datetime, timedelta
 from pydantic import BaseModel
 
 from ..services.database import get_db
-from ..models.user import User, UserRole
+from ..models.user import User
 from ..models.student import Student, Class, Teacher
 from ..models.grade import Grade, Attendance
 from ..models.fee import Fee
-# Import new models
-from ..models.timetable import TimeSlot
-from ..models.event import Event
-from ..models.message import Message
-from ..models.report_card import ReportCard, GradeSummary
-from ..models.learning_material import LearningMaterial, ClassMaterial
+
+# Import models from timetable.py instead of separate files
+from ..models.timetable import TimeSlot, Event, Message, ReportCard, GradeSummary, LearningMaterial, ClassMaterial
 
 from ..utils.auth_utils import get_current_active_user
 
@@ -52,7 +49,7 @@ async def get_dashboard_summary(
     teacher_count = db.query(func.count(Teacher.id)).scalar() or 0
     
     # Parent count
-    parent_count = db.query(func.count(User.id)).filter(User.role == UserRole.PARENT).scalar() or 0
+    parent_count = db.query(func.count(User.id)).filter(User.role == "parent").scalar() or 0
     
     # Class count
     class_count = db.query(func.count(Class.id)).scalar() or 0

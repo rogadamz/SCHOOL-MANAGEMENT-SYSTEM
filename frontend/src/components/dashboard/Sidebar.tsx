@@ -11,7 +11,11 @@ import {
   Award,
   UserRound,
   BookOpen,
-  School
+  School,
+  MessageSquare,
+  FileText,
+  BookMarked,
+  Clock
 } from 'lucide-react'
 
 const sidebarItems = [
@@ -64,6 +68,30 @@ const sidebarItems = [
     description: "Manage class sections"
   },
   {
+    title: "Report Cards",
+    href: "/dashboard/reports",
+    icon: FileText,
+    description: "Student report cards and progress reports"
+  },
+  {
+    title: "Timetable",
+    href: "/dashboard/timetable",
+    icon: Clock,
+    description: "Class schedules and timetables"
+  },
+  {
+    title: "Learning Materials",
+    href: "/dashboard/materials",
+    icon: BookMarked,
+    description: "Educational resources and materials"
+  },
+  {
+    title: "Messages",
+    href: "/dashboard/messages",
+    icon: MessageSquare,
+    description: "Communication between users"
+  },
+  {
     title: "School",
     href: "/dashboard/school",
     icon: School,
@@ -92,7 +120,7 @@ export const Sidebar = () => {
               Downtown Nursery
             </h2>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 max-h-[calc(100vh-140px)] overflow-y-auto">
             {sidebarItems.map((item) => (
               <Link
                 key={item.href}
