@@ -27,6 +27,8 @@ class Student(Base):
     grades = relationship("Grade", back_populates="student", cascade="all, delete-orphan")
     attendances = relationship("Attendance", back_populates="student", cascade="all, delete-orphan")
     classes = relationship("Class", secondary=student_class, back_populates="students")
+    # Add this line:
+    report_cards = relationship("ReportCard", back_populates="student")
 
 class Class(Base):
     __tablename__ = "classes"
@@ -40,6 +42,8 @@ class Class(Base):
     teacher = relationship("Teacher", back_populates="classes")
     students = relationship("Student", secondary=student_class, back_populates="classes")
 
+    time_slots = relationship("TimeSlot", back_populates="class_ref")
+
 class Teacher(Base):
     __tablename__ = "teachers"
     
@@ -50,3 +54,4 @@ class Teacher(Base):
     # Relationships
     user = relationship("User", back_populates="teacher_profile")
     classes = relationship("Class", back_populates="teacher", cascade="all, delete-orphan")
+    time_slots = relationship("TimeSlot", back_populates="teacher")  # Add this line
