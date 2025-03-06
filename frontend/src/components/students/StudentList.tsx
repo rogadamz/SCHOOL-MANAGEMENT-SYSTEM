@@ -1,55 +1,71 @@
 // src/components/students/StudentList.tsx
-import { useState, useEffect } from 'react'
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Search, RotateCw } from 'lucide-react'
-import { dashboardApi, type Student } from '@/services/api'
+import { useState } from 'react';
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, RefreshCw } from 'lucide-react';
+import { dashboardApi, Student } from '@/services/api';
 
-export const StudentList = () => {
-  const [students, setStudents] = useState<Student[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+interface StudentListProps {
+  students: Student[];
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => void;
+}
 
-  useEffect(() => {
-    fetchStudents()
-  }, [])
+export const StudentList = ({ 
+  students: initialStudents, 
+  loading, 
+  error, 
+  onRefresh 
+}: StudentListProps) => {
+  const [students, setStudents] = useState<Student[]>(initialStudents);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchLoading, setSearchLoading] = useState(false);
 
-  const fetchStudents = async () => {
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     try {
-      setLoading(true)
-      const data = await dashboardApi.getStudents()
-      setStudents(data)
+      setSearchLoading(true);
+      const results = await dashboardApi.getStudents(searchQuery);
+      setStudents(results);
     } catch (err) {
-      console.error('Error fetching students:', err)
-      setError('Failed to load students')
+      console.error('Error searching students:', err);
     } finally {
-      setLoading(false)
+      setSearchLoading(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    onRefresh();
+    setSearchQuery('');
+    
+    try {
+      const results = await dashboardApi.getStudents();
+      setStudents(results);
+    } catch (err) {
+      console.error('Error refreshing students:', err);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center p-8">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+    </div>;
   }
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!searchQuery.trim()) {
-      fetchStudents()
-      return
-    }
-    
-    // Filter students locally
-    const filteredStudents = students.filter(student => 
-      student.first_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.last_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.admission_number.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    
-    setStudents(filteredStudents)
+  if (error) {
+    return <div className="text-red-500 p-8 flex flex-col items-center">
+      <p className="mb-4">{error}</p>
+      <Button onClick={handleRefresh}>Try Again</Button>
+    </div>;
   }
 
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Students</h2>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <form onSubmit={handleSearch} className="flex gap-2">
             <Input
               type="search"
@@ -58,12 +74,16 @@ export const StudentList = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-64"
             />
-            <Button type="submit">
-              <Search className="h-4 w-4" />
+            <Button type="submit" disabled={searchLoading}>
+              {searchLoading ? (
+                <div className="animate-spin h-4 w-4 border-b-2 border-white rounded-full"></div>
+              ) : (
+                <Search className="h-4 w-4" />
+              )}
             </Button>
           </form>
-          <Button variant="outline" onClick={fetchStudents}>
-            <RotateCw className="h-4 w-4" />
+          <Button variant="outline" onClick={handleRefresh}>
+            <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -93,47 +113,35 @@ export const StudentList = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
+            {students.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-6 py-4 text-center">Loading students...</td>
-              </tr>
-            ) : error ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 text-center text-red-500">{error}</td>
-              </tr>
-            ) : students.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-4 text-center">No students found</td>
+                <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                  No students found
+                </td>
               </tr>
             ) : (
               students.map((student) => (
                 <tr key={student.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {student.admission_number}
+                    {student.studentId}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {student.first_name} {student.last_name}
+                    {student.firstName} {student.lastName}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {/* Check if student is associated with any classes */}
-                    {student.classes && student.classes.length > 0 
-                      ? student.classes[0].grade_level 
-                      : 'N/A'}
+                    {student.gradeLevel}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {student.classes && student.classes.length > 0 
-                      ? student.classes[0].name
-                      : 'N/A'}
+                    {student.classSection}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {/* You don't have email in your Student model, so using a placeholder */}
-                    {`${student.first_name.toLowerCase()}.${student.last_name.toLowerCase()}@downtown.edu`}
+                    {student.email}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {/* Add view details handler */}}
+                      onClick={() => {/* View details handler */}}
                     >
                       View Details
                     </Button>
@@ -145,5 +153,5 @@ export const StudentList = () => {
         </table>
       </div>
     </div>
-  )
-}
+  );
+};
