@@ -80,17 +80,19 @@ async def get_dashboard_summary(
     
     # Count attendance by status
     attendance_counts = db.query(
-        Attendance.status,
+        Attendance.present,
         func.count(Attendance.id).label("count")
     ).filter(
         Attendance.date == today
     ).group_by(
-        Attendance.status
+        Attendance.present
     ).all()
     
-    for status, count in attendance_counts:
-        if status in attendance_stats:
-            attendance_stats[status] = count
+    for is_present, count in attendance_counts:
+        if is_present:
+            attendance_stats["present"] = count
+        else:
+            attendance_stats["absent"] = count
     
     # Calculate attendance rate
     total_marked = sum(attendance_stats[status] for status in ["present", "absent", "late", "excused"])

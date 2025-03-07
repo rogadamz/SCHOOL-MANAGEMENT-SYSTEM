@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from config import DATABASE_URL
 
-from app.models.learning_material import LearningMaterial, ClassMaterial
+from app.models.timetable import LearningMaterial, ClassMaterial
 from app.models.student import Teacher, Class
 
 # Create database engine

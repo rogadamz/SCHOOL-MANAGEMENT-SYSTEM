@@ -12,7 +12,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from config import DATABASE_URL
 
-from app.models.report_card import ReportCard, GradeSummary
+# Import models correctly
+from app.models.timetable import ReportCard, GradeSummary
 from app.models.user import User
 from app.models.student import Student, Teacher
 

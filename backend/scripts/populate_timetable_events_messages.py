@@ -12,10 +12,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from config import DATABASE_URL
 
-from app.models.timetable import TimeSlot
-from app.models.event import Event
-from app.models.message import Message
-from app.models.user import Base, User
+# Import models correctly from timetable.py instead of separate files
+from app.models.timetable import TimeSlot, Event, Message
+from app.models.user import User, Base
+from app.models.student import Teacher, Class
 
 # Create database engine
 engine = create_engine(DATABASE_URL)
