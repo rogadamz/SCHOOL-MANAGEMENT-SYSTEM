@@ -1,3 +1,4 @@
+// frontend/src/components/dashboard/charts/AttendanceChart.tsx
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -24,10 +25,26 @@ export const AttendanceChart = ({ data }: AttendanceChartProps) => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis />
-              <Tooltip />
+              <Tooltip 
+                formatter={(value, name) => [
+                  value, 
+                  name === "present" ? "Present" : "Absent"
+                ]}
+              />
               <Legend />
-              <Line type="monotone" dataKey="present" stroke="#2563eb" />
-              <Line type="monotone" dataKey="absent" stroke="#dc2626" />
+              <Line 
+                type="monotone" 
+                dataKey="present" 
+                stroke="#2563eb" 
+                name="Present"
+                activeDot={{ r: 6 }} 
+              />
+              <Line 
+                type="monotone" 
+                dataKey="absent" 
+                stroke="#dc2626" 
+                name="Absent" 
+              />
             </LineChart>
           </ResponsiveContainer>
         </div>

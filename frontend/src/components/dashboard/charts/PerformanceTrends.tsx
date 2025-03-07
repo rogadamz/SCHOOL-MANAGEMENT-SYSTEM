@@ -1,3 +1,4 @@
+// frontend/src/components/dashboard/charts/PerformanceTrends.tsx
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
@@ -17,7 +18,7 @@ export const PerformanceTrends = ({ data }: PerformanceTrendsProps) => {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Performance Trends by Subject</CardTitle>
+        <CardTitle>Performance Trends</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="h-[300px]">
@@ -25,14 +26,17 @@ export const PerformanceTrends = ({ data }: PerformanceTrendsProps) => {
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
+              <YAxis domain={[0, 100]} />
+              <Tooltip 
+                formatter={(value) => [`${value}%`, '']}
+              />
               <Legend />
               <Line 
                 type="monotone" 
                 dataKey="averageScore" 
                 stroke="#2563eb" 
                 name="Average Score"
+                activeDot={{ r: 6 }}
               />
               <Line 
                 type="monotone" 
