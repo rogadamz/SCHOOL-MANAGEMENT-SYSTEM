@@ -80,7 +80,7 @@ async def get_dashboard_summary(
     
     # Count total attendance records for today (simplest approach)
     attendance_count = db.query(func.count(Attendance.id)).filter(
-        Attendance.date == today
+        Attendance.date == today  # Fixed: Changed day_date to today
     ).scalar() or 0
     
     # For simplicity, assume all records are "present" until we fix the model issue
@@ -90,19 +90,6 @@ async def get_dashboard_summary(
     attendance_stats["total"] = student_count
     attendance_stats["rate"] = (attendance_stats["present"] / attendance_stats["total"] * 100) if attendance_stats["total"] > 0 else 0
 
-# In get_calendar_day_summary function:
-    # Count total attendance records for this day (simplest approach)
-    attendance_count = db.query(func.count(Attendance.id)).filter(
-        Attendance.date == day_date
-    ).scalar() or 0
-    
-    # For simplicity, assume all records are "present" until we fix the model issue
-    attendance_stats["present"] = attendance_count
-    
-    # Calculate attendance rate
-    attendance_stats["total"] = student_count
-    attendance_stats["rate"] = (attendance_stats["present"] / attendance_stats["total"] * 100) if attendance_stats["total"] > 0 else 0
-    
     # Recent events (next 5 events)
     recent_events = db.query(Event).filter(
         Event.start_date >= today
@@ -221,6 +208,9 @@ async def get_calendar_day_summary(
 ):
     """Get attendance, events, and financial data for a specific calendar day"""
     
+    # Get student count (adding this to fix the error)
+    student_count = db.query(func.count(Student.id)).scalar() or 0
+    
     # Get attendance data for this day
     attendance_stats = {
         "present": 0,
@@ -240,7 +230,7 @@ async def get_calendar_day_summary(
     attendance_stats["present"] = attendance_count
     
     # Calculate attendance rate
-    attendance_stats["total"] = student_count
+    attendance_stats["total"] = student_count  # Now student_count is defined
     attendance_stats["rate"] = (attendance_stats["present"] / attendance_stats["total"] * 100) if attendance_stats["total"] > 0 else 0
 
     # Get events for this day
@@ -276,10 +266,13 @@ async def get_calendar_day_summary(
         fee_data["collected"] += fee.paid
         fee_data["pending"] += (fee.amount - fee.paid)
     
+    # Fix: Use attendance_count instead of undefined total_marked
+    has_data = bool(attendance_count > 0 or events_data or fees_due)
+    
     return {
         "date": day_date.isoformat(),
         "attendance": attendance_stats,
         "events": events_data,
         "fees": fee_data,
-        "has_data": bool(total_marked > 0 or events_data or fees_due)
+        "has_data": has_data
     }

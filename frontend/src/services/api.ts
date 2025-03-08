@@ -14,21 +14,57 @@ const api = axios.create({
 // Add request interceptor to add auth token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
+  
+  // Log the token status for debugging (remove in production)
+  console.log("API Request:", config.url);
+  console.log("Token exists:", !!token);
+  
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    // Check if token is valid and not expired
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const isExpired = payload.exp * 1000 < Date.now();
+      
+      if (isExpired) {
+        console.error("Token expired in request interceptor");
+        // Clear the token and redirect to login
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+        return Promise.reject("Token expired");
+      }
+      
+      config.headers.Authorization = `Bearer ${token}`;
+    } catch (error) {
+      console.error("Invalid token format in request interceptor:", error);
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+      return Promise.reject("Invalid token");
+    }
   }
+  
   return config;
+}, (error) => {
+  console.error("Request interceptor error:", error);
+  return Promise.reject(error);
 });
 
 // Add response interceptor to handle errors
 api.interceptors.response.use(
   response => response,
   error => {
+    console.error("API Error Response:", error);
+    
     // Handle token expiration
     if (error.response && error.response.status === 401) {
+      console.error("Unauthorized access - clearing token");
       localStorage.removeItem('token');
-      window.location.href = '/login';
+      
+      // Only redirect if we're not already on the login page
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
     }
+    
     return Promise.reject(error);
   }
 );
