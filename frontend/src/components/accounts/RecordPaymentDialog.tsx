@@ -1,11 +1,20 @@
-// frontend/src/components/accounts/RecordPaymentDialog.tsx
+// src/components/accounts/RecordPaymentDialog.tsx
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DollarSign, AlertCircle } from 'lucide-react';
 import { Fee } from '@/services/api';
-import { AlertCircle } from 'lucide-react';
 
 interface RecordPaymentDialogProps {
   fee: Fee;
@@ -14,43 +23,63 @@ interface RecordPaymentDialogProps {
   onPayment: (feeId: number, amount: number) => void;
 }
 
-export const RecordPaymentDialog = ({ 
+export function RecordPaymentDialog({ 
   fee, 
   studentName, 
   onClose, 
   onPayment 
-}: RecordPaymentDialogProps) => {
-  const [amount, setAmount] = useState<string>((fee.amount - fee.paid).toString());
+}: RecordPaymentDialogProps) {
+  const [amount, setAmount] = useState<number>(fee.amount - fee.paid);
+  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
+  const [reference, setReference] = useState<string>('');
+  const [sendReceipt, setSendReceipt] = useState<boolean>(true);
   const [error, setError] = useState<string>('');
-  
-  const remainingBalance = fee.amount - fee.paid;
-  
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
+
+  // Format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-UG', {
+      style: 'currency',
+      currency: 'UGX',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  // Format date
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const paymentAmount = parseFloat(amount);
-    
-    // Validate payment amount
-    if (isNaN(paymentAmount) || paymentAmount <= 0) {
-      setError('Please enter a valid payment amount');
+    // Validate amount
+    if (!amount || amount <= 0) {
+      setError('Please enter a valid amount');
       return;
     }
-    
-    if (paymentAmount > remainingBalance) {
-      setError('Payment amount cannot exceed the remaining balance');
+
+    if (amount > (fee.amount - fee.paid)) {
+      setError(`Payment amount cannot exceed the remaining balance of ${formatCurrency(fee.amount - fee.paid)}`);
       return;
     }
+
+    // Process payment
+    setIsProcessing(true);
     
-    onPayment(fee.id, paymentAmount);
-  };
-  
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount);
+    try {
+      onPayment(fee.id, amount);
+      // If we reached this point, it means the payment was successful
+    } catch (err) {
+      setError('Failed to process payment. Please try again.');
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -58,88 +87,123 @@ export const RecordPaymentDialog = ({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Record Payment</DialogTitle>
+          <DialogDescription>
+            Record a payment for {studentName}
+          </DialogDescription>
         </DialogHeader>
         
-        <div className="py-4">
-          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-4">
-            <h3 className="font-medium text-blue-800 mb-2">Fee Details</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-gray-600">Student:</div>
-              <div className="font-medium">{studentName}</div>
-              
-              <div className="text-gray-600">Description:</div>
-              <div className="font-medium">{fee.description}</div>
-              
-              <div className="text-gray-600">Total Amount:</div>
-              <div className="font-medium">{formatCurrency(fee.amount)}</div>
-              
-              <div className="text-gray-600">Amount Paid:</div>
-              <div className="font-medium">{formatCurrency(fee.paid)}</div>
-              
-              <div className="text-gray-600">Remaining Balance:</div>
-              <div className="font-medium text-red-600">{formatCurrency(remainingBalance)}</div>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            {/* Fee details summary */}
+            <div className="bg-gray-50 p-4 rounded-md mb-2">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="text-gray-500">Invoice:</div>
+                <div className="font-medium">{fee.description}</div>
+                
+                <div className="text-gray-500">Due Date:</div>
+                <div className="font-medium">{formatDate(fee.due_date)}</div>
+                
+                <div className="text-gray-500">Total Amount:</div>
+                <div className="font-medium">{formatCurrency(fee.amount)}</div>
+                
+                <div className="text-gray-500">Already Paid:</div>
+                <div className="font-medium">{formatCurrency(fee.paid)}</div>
+                
+                <div className="text-gray-500">Remaining Balance:</div>
+                <div className="font-medium text-red-600">{formatCurrency(fee.amount - fee.paid)}</div>
+              </div>
             </div>
-          </div>
-          
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right">
-                  Payment Amount ($)
-                </Label>
-                <div className="col-span-3">
+            
+            {/* Payment amount */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Payment Amount
+              </Label>
+              <div className="col-span-3">
+                <div className="relative">
+                  <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
                   <Input
                     id="amount"
                     type="number"
+                    className="pl-8"
+                    placeholder="Enter amount"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    min="0.01"
-                    max={remainingBalance}
-                    step="0.01"
-                    autoFocus
+                    onChange={(e) => setAmount(Number(e.target.value))}
+                    min={0}
+                    max={fee.amount - fee.paid}
+                    step={1000}
                   />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Maximum payment: {formatCurrency(remainingBalance)}
-                  </p>
-                </div>
-              </div>
-              
-              {error && (
-                <div className="flex items-center gap-2 text-sm text-red-500 mt-2">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>{error}</span>
-                </div>
-              )}
-              
-              <div className="mt-2">
-                <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                  <div className="flex justify-between mb-1 text-sm">
-                    <span>Current balance</span>
-                    <span>{formatCurrency(remainingBalance)}</span>
-                  </div>
-                  <div className="flex justify-between mb-1 text-sm">
-                    <span>Payment amount</span>
-                    <span>{formatCurrency(parseFloat(amount) || 0)}</span>
-                  </div>
-                  <div className="border-t pt-1 mt-1">
-                    <div className="flex justify-between font-medium">
-                      <span>New balance</span>
-                      <span>{formatCurrency(remainingBalance - (parseFloat(amount) || 0))}</span>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
             
-            <DialogFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit">Record Payment</Button>
-            </DialogFooter>
-          </form>
-        </div>
+            {/* Payment method */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="method" className="text-right">
+                Payment Method
+              </Label>
+              <div className="col-span-3">
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger id="method">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="bank">Bank Transfer</SelectItem>
+                    <SelectItem value="mobile">Mobile Money</SelectItem>
+                    <SelectItem value="card">Card Payment</SelectItem>
+                    <SelectItem value="check">Check</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Reference number */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="reference" className="text-right">
+                Reference
+              </Label>
+              <Input
+                id="reference"
+                placeholder="Optional reference number"
+                className="col-span-3"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+              />
+            </div>
+            
+            {/* Receipt option */}
+            <div className="grid grid-cols-4 items-center gap-4">
+              <div></div>
+              <div className="flex items-center space-x-2 col-span-3">
+                <Checkbox 
+                  id="receipt" 
+                  checked={sendReceipt}
+                  onCheckedChange={(checked) => setSendReceipt(checked as boolean)}
+                />
+                <Label htmlFor="receipt">Send receipt to parent/guardian</Label>
+              </div>
+            </div>
+            
+            {/* Error message */}
+            {error && (
+              <div className="flex items-center gap-2 text-red-600 text-sm">
+                <AlertCircle className="h-4 w-4" />
+                <span>{error}</span>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isProcessing}>
+              {isProcessing ? 'Processing...' : 'Record Payment'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
-};
+}
