@@ -1,91 +1,100 @@
 // frontend/src/components/accounts/AddFeeDialog.tsx
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Student } from '@/services/api';
 
 interface AddFeeDialogProps {
   students: Student[];
   onClose: () => void;
-  onAdd: (fee: any) => void;
+  onAdd: (feeData: any) => void;
 }
 
 export const AddFeeDialog = ({ students, onClose, onAdd }: AddFeeDialogProps) => {
-  const [studentId, setStudentId] = useState('');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [paid, setPaid] = useState('0');
-  const [status, setStatus] = useState('pending');
-  const [term, setTerm] = useState('Term 1');
-  const [academicYear, setAcademicYear] = useState('2024-2025');
-  const [error, setError] = useState('');
+  const [studentId, setStudentId] = useState<string>('');
+  const [amount, setAmount] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
+  const [dueDate, setDueDate] = useState<string>('');
+  const [term, setTerm] = useState<string>('');
+  const [academicYear, setAcademicYear] = useState<string>(
+    `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`
+  );
+  const [initialPayment, setInitialPayment] = useState<string>('0');
+  const [error, setError] = useState<string>('');
+
+  const terms = ['Term 1', 'Term 2', 'Term 3'];
+  
+  const currentYear = new Date().getFullYear();
+  const academicYears = [
+    `${currentYear-1}-${currentYear}`,
+    `${currentYear}-${currentYear+1}`,
+    `${currentYear+1}-${currentYear+2}`
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate inputs
     if (!studentId || !amount || !description || !dueDate || !term || !academicYear) {
-      setError('Please fill all required fields');
+      setError('Please fill in all required fields');
       return;
     }
-
-    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
-      setError('Amount must be a positive number');
+    
+    // Validate amount
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setError('Please enter a valid amount');
       return;
     }
-
-    if (isNaN(parseFloat(paid)) || parseFloat(paid) < 0) {
-      setError('Paid amount must be a non-negative number');
+    
+    // Validate initial payment
+    const parsedInitialPayment = parseFloat(initialPayment || '0');
+    if (isNaN(parsedInitialPayment) || parsedInitialPayment < 0) {
+      setError('Please enter a valid initial payment amount');
       return;
     }
-
-    if (parseFloat(paid) > parseFloat(amount)) {
-      setError('Paid amount cannot exceed total amount');
+    
+    if (parsedInitialPayment > parsedAmount) {
+      setError('Initial payment cannot exceed the fee amount');
       return;
     }
-
-    // Create fee object
+    
+    // Create new fee object
     const newFee = {
       student_id: parseInt(studentId),
-      amount: parseFloat(amount),
+      amount: parsedAmount,
+      paid: parsedInitialPayment,
       description,
       due_date: dueDate,
-      paid: parseFloat(paid),
-      status: parseFloat(paid) === parseFloat(amount) ? 'paid' : 
-             parseFloat(paid) > 0 ? 'partial' : 'pending',
       term,
-      academic_year: academicYear
+      academic_year: academicYear,
+      status: parsedInitialPayment >= parsedAmount ? 'paid' : 
+              parsedInitialPayment > 0 ? 'partial' : 'pending'
     };
-
+    
     onAdd(newFee);
-    onClose();
+  };
+
+  // Helper to format student name with ID
+  const formatStudentOption = (student: Student) => {
+    return `${student.first_name} ${student.last_name} (ID: ${student.id})`;
   };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[550px]">
         <DialogHeader>
           <DialogTitle>Add New Fee</DialogTitle>
-          <DialogDescription>
-            Create a new fee record for a student.
-          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="student" className="text-right">
-                Student
+                Student *
               </Label>
               <div className="col-span-3">
                 <Select value={studentId} onValueChange={setStudentId}>
@@ -93,60 +102,106 @@ export const AddFeeDialog = ({ students, onClose, onAdd }: AddFeeDialogProps) =>
                     <SelectValue placeholder="Select student" />
                   </SelectTrigger>
                   <SelectContent>
-                    {students.map((student) => (
+                    {students.map(student => (
                       <SelectItem key={student.id} value={student.id.toString()}>
-                        {student.first_name} {student.last_name} ({student.admission_number})
+                        {formatStudentOption(student)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="term" className="text-right">
+                Term *
+              </Label>
+              <div className="col-span-3">
+                <Select value={term} onValueChange={setTerm}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {terms.map(t => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="academicYear" className="text-right">
+                Academic Year *
+              </Label>
+              <div className="col-span-3">
+                <Select value={academicYear} onValueChange={setAcademicYear}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select academic year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {academicYears.map(year => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="description" className="text-right">
-                Description
+                Description *
               </Label>
-              <Input
-                id="description"
-                className="col-span-3"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Tuition Fee, Activity Fee, etc."
-              />
+              <div className="col-span-3">
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="E.g., Tuition Fee, Lab Fee, Activity Fee"
+                />
+              </div>
             </div>
+            
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="amount" className="text-right">
-                Amount
+                Amount * ($)
               </Label>
               <Input
                 id="amount"
                 type="number"
-                step="0.01"
-                min="0"
                 className="col-span-3"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                min="0"
+                step="0.01"
                 placeholder="0.00"
               />
             </div>
+            
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="paid" className="text-right">
-                Paid Amount
+              <Label htmlFor="initialPayment" className="text-right">
+                Initial Payment ($)
               </Label>
               <Input
-                id="paid"
+                id="initialPayment"
                 type="number"
-                step="0.01"
-                min="0"
                 className="col-span-3"
-                value={paid}
-                onChange={(e) => setPaid(e.target.value)}
+                value={initialPayment}
+                onChange={(e) => setInitialPayment(e.target.value)}
+                min="0"
+                max={amount}
+                step="0.01"
                 placeholder="0.00"
               />
             </div>
+            
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="dueDate" className="text-right">
-                Due Date
+                Due Date *
               </Label>
               <Input
                 id="dueDate"
@@ -156,38 +211,14 @@ export const AddFeeDialog = ({ students, onClose, onAdd }: AddFeeDialogProps) =>
                 onChange={(e) => setDueDate(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="term" className="text-right">
-                Term
-              </Label>
-              <Select value={term} onValueChange={setTerm}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select term" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Term 1">Term 1</SelectItem>
-                  <SelectItem value="Term 2">Term 2</SelectItem>
-                  <SelectItem value="Term 3">Term 3</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="academicYear" className="text-right">
-                Academic Year
-              </Label>
-              <Select value={academicYear} onValueChange={setAcademicYear}>
-                <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select academic year" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="2023-2024">2023-2024</SelectItem>
-                  <SelectItem value="2024-2025">2024-2025</SelectItem>
-                  <SelectItem value="2025-2026">2025-2026</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+            
+            {error && (
+              <div className="col-span-4 text-sm text-red-500 text-center">
+                {error}
+              </div>
+            )}
           </div>
+          
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel

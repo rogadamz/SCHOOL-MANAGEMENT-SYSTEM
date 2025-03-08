@@ -1,543 +1,261 @@
 // frontend/src/pages/Students.tsx
 import { useState, useEffect } from 'react';
-import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  PlusCircle, 
-  Search, 
-  Loader2, 
-  UserPlus, 
-  Calendar, 
-  School, 
-  MoreHorizontal, 
-  Edit, 
-  Trash, 
-  Eye,
-  Download,
-  Filter,
-  RefreshCw,
-  UserCheck,
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle,
-  XCircle,
-  BookOpen,
-  FileText,
-  DollarSign
-} from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { dashboardApi, Student, User, Fee, ReportCard } from '@/services/api';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { dashboardApi } from '@/services/api';
+import { RefreshCw, Search, Download, UserPlus } from 'lucide-react';
 import { AddStudentDialog } from '@/components/students/AddStudentDialog';
 import { StudentDetailsDialog } from '@/components/students/StudentDetailsDialog';
-import { SubjectComparison } from '@/components/dashboard/charts/SubjectComparison';
-import { AttendanceChart } from '@/components/dashboard/charts/AttendanceChart';
 
 export const Students = () => {
-  const [students, setStudents] = useState<Student[]>([]);
-  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
-  const [parents, setParents] = useState<User[]>([]);
+  const [students, setStudents] = useState([]);
+  const [parents, setParents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [gradeFilter, setGradeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [page, setPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [studentData, setStudentData] = useState<{
-    fees: Fee[],
-    reportCards: ReportCard[]
-  }>({
-    fees: [],
-    reportCards: []
-  });
-
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Fetch students and parents in parallel
-        const [studentsData, parentsData] = await Promise.all([
-          dashboardApi.getStudents(),
-          dashboardApi.getParents()
-        ]);
-        
-        setStudents(studentsData);
-        setFilteredStudents(studentsData);
-        setParents(parentsData);
-      } catch (error) {
-        console.error('Error fetching data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchStudentsData();
+    fetchParentsData();
   }, []);
-
-  useEffect(() => {
-    // Filter students based on search query, grade filter and status filter
-    let filtered = students;
-    
-    // Apply search filter
-    if (searchQuery) {
-      filtered = filtered.filter(student => 
-        `${student.first_name} ${student.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.admission_number.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-    
-    // Apply grade filter (assuming the property exists)
-    if (gradeFilter !== 'all') {
-      filtered = filtered.filter(student => 
-        student.class_name?.toLowerCase().includes(gradeFilter.toLowerCase())
-      );
-    }
-    
-    // Apply status filter (this would need attendance or enrollment status data)
-    if (statusFilter === 'active') {
-      // This is a placeholder - in a real app, you'd filter by actual status
-      filtered = filtered.filter(student => true);
-    } else if (statusFilter === 'inactive') {
-      // Just for demo, exclude a few students randomly
-      filtered = filtered.filter(student => student.id % 10 !== 0);
-    }
-    
-    setFilteredStudents(filtered);
-  }, [searchQuery, gradeFilter, statusFilter, students]);
-
-  const getStudentDetailsData = async (student: Student) => {
+  
+  const fetchStudentsData = async () => {
     try {
-      // Fetch fees and report cards in parallel
-      const [feesData, reportCardsData] = await Promise.all([
-        dashboardApi.getStudentFees(student.id),
-        dashboardApi.getStudentReportCards(student.id)
-      ]);
-      
-      setStudentData({
-        fees: feesData,
-        reportCards: reportCardsData
-      });
-    } catch (error) {
-      console.error('Error fetching student details:', error);
-      // Set empty data
-      setStudentData({
-        fees: [],
-        reportCards: []
-      });
-    }
-  };
-
-  const handleAddStudent = async (newStudent: any) => {
-    setLoading(true);
-    try {
-      const addedStudent = await dashboardApi.createStudent(newStudent);
-      
-      setStudents([...students, addedStudent]);
-      setFilteredStudents([...students, addedStudent]);
-    } catch (error) {
-      console.error('Error adding student:', error);
+      setLoading(true);
+      const data = await dashboardApi.getStudents();
+      setStudents(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching students:', err);
+      setError('Failed to load students data');
     } finally {
       setLoading(false);
     }
   };
-
-  const handleViewDetails = (student: Student) => {
+  
+  const fetchParentsData = async () => {
+    try {
+      const data = await dashboardApi.getParents();
+      setParents(data);
+    } catch (err) {
+      console.error('Error fetching parents:', err);
+    }
+  };
+  
+  const handleSearch = (e) => {
+    e.preventDefault();
+    fetchStudentsData();
+  };
+  
+  const handleAddStudent = async (studentData) => {
+    try {
+      await dashboardApi.createStudent(studentData);
+      fetchStudentsData();
+    } catch (err) {
+      console.error('Error creating student:', err);
+    }
+  };
+  
+  const handleViewStudent = (student) => {
     setSelectedStudent(student);
-    getStudentDetailsData(student);
-    setIsDetailsDialogOpen(true);
   };
-
-  const handleExportStudents = () => {
-    // Create CSV content
-    let csv = 'Student ID,First Name,Last Name,Date of Birth,Admission Number,Parent/Guardian\n';
-    
-    filteredStudents.forEach(student => {
-      const parentName = getParentName(student.parent_id);
-      csv += `${student.id},"${student.first_name}","${student.last_name}","${student.date_of_birth}","${student.admission_number}","${parentName}"\n`;
-    });
-    
-    // Create and trigger download
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'students.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  
+  const getParentName = (parentId) => {
+    const parent = parents.find(p => p.id === parentId);
+    return parent ? parent.full_name : 'Unknown';
   };
-
-  const formatDate = (dateString: string) => {
+  
+  const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
-      month: 'long',
+      month: 'short',
       day: 'numeric'
     });
   };
 
-  const getParentName = (parentId: number) => {
-    const parent = parents.find(p => p.id === parentId);
-    return parent ? parent.full_name : 'Unknown';
-  };
-
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
-  const startIndex = (page - 1) * itemsPerPage;
-  const paginatedStudents = filteredStudents.slice(startIndex, startIndex + itemsPerPage);
-
-  const studentGradeOptions = [
-    { value: 'all', label: 'All Grades' },
-    { value: 'pre-k', label: 'Pre-K' },
-    { value: 'kindergarten', label: 'Kindergarten' },
-    { value: '1st', label: '1st Grade' },
-    { value: '2nd', label: '2nd Grade' },
-  ];
-
-  const studentStatusOptions = [
-    { value: 'all', label: 'All Statuses' },
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
-  ];
-
   return (
-    <DashboardLayout>
-      <div className="p-4 md:p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-2">
-          <h1 className="text-2xl font-bold">Student Management</h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportStudents}>
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <PlusCircle className="h-4 w-4 mr-2" />
-              Add Student
-            </Button>
-          </div>
+    <div className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Student Management</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => fetchStudentsData()}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+          <Button variant="outline">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button onClick={() => setIsAddDialogOpen(true)}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add Student
+          </Button>
         </div>
-
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{students.length}</div>
-              <p className="text-xs text-gray-500">Currently enrolled</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Guardians</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{parents.length}</div>
-              <p className="text-xs text-gray-500">Registered parents</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Average Age</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {students.length > 0 
-                  ? Math.round(students.reduce((sum, student) => {
-                      const birthDate = new Date(student.date_of_birth);
-                      const ageInYears = (new Date().getTime() - birthDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
-                      return sum + ageInYears;
-                    }, 0) / students.length) 
-                  : '--'}
-              </div>
-              <p className="text-xs text-gray-500">Years</p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Attendance Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">87%</div>
-              <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
-                <div className="bg-green-600 h-2 rounded-full" style={{ width: '87%' }}></div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Students List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Student Directory</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="mb-4">
-              <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
-                <TabsList>
-                  <TabsTrigger value="all">All Students</TabsTrigger>
-                  <TabsTrigger value="pre-k">Pre-K</TabsTrigger>
-                  <TabsTrigger value="kindergarten">Kindergarten</TabsTrigger>
-                  <TabsTrigger value="elementary">Elementary</TabsTrigger>
-                </TabsList>
-                
-                <div className="flex flex-wrap gap-2">
-                  <div className="relative">
-                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-500" />
-                    <Input
-                      type="text"
-                      placeholder="Search students..."
-                      className="pl-8 md:w-64"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Select value={gradeFilter} onValueChange={setGradeFilter}>
-                      <SelectTrigger className="h-9 w-[130px]">
-                        <SelectValue placeholder="Grade" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {studentGradeOptions.map(option => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="h-9 w-[130px]">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {studentStatusOptions.map(option => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Button variant="outline" size="icon">
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </Tabs>
-            
-            {loading ? (
-              <div className="flex justify-center items-center py-10 text-primary">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            ) : (
-              <>
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Student</TableHead>
-                        <TableHead>ID / Admission #</TableHead>
-                        <TableHead>Date of Birth</TableHead>
-                        <TableHead>Parent/Guardian</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paginatedStudents.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-10 text-gray-500">
-                            No students match your search criteria
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        paginatedStudents.map((student) => (
-                          <TableRow key={student.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="bg-primary/10 p-2 rounded-full">
-                                  <UserPlus className="h-4 w-4 text-primary" />
-                                </div>
-                                <div>
-                                  <div className="font-medium">{student.first_name} {student.last_name}</div>
-                                  <div className="text-xs text-gray-500">{student.class_name || 'Class not assigned'}</div>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="text-sm">{student.id}</div>
-                              <div className="text-xs text-gray-500">{student.admission_number}</div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-500" />
-                                <span>{formatDate(student.date_of_birth)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>{getParentName(student.parent_id)}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                {/* Just for demo, make most students active */}
-                                {student.id % 10 !== 0 ? (
-                                  <>
-                                    <span className="flex h-2 w-2 rounded-full bg-green-600"></span>
-                                    <span className="text-sm">Active</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="flex h-2 w-2 rounded-full bg-gray-300"></span>
-                                    <span className="text-sm">Inactive</span>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => handleViewDetails(student)}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit Student
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <UserCheck className="h-4 w-4 mr-2" />
-                                    Record Attendance
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <BookOpen className="h-4 w-4 mr-2" />
-                                    View Report Cards
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    View Grades
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <DollarSign className="h-4 w-4 mr-2" />
-                                    View Fees
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem className="text-red-600">
-                                    <Trash className="h-4 w-4 mr-2" />
-                                    Delete Student
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-                
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="text-sm text-gray-500">
-                      Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredStudents.length)} of {filteredStudents.length} students
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setPage(Math.max(1, page - 1))}
-                        disabled={page === 1}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                      <div className="text-sm">
-                        Page {page} of {totalPages}
-                      </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setPage(Math.min(totalPages, page + 1))}
-                        disabled={page === totalPages}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-        
-        {/* Quick Stats */}
-        {!loading && students.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AttendanceChart 
-                  data={[
-                    { date: 'Mon', present: 85, absent: 15 },
-                    { date: 'Tue', present: 90, absent: 10 },
-                    { date: 'Wed', present: 88, absent: 12 },
-                    { date: 'Thu', present: 92, absent: 8 },
-                    { date: 'Fri', present: 95, absent: 5 },
-                  ]} 
-                />
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Performance by Subject</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <SubjectComparison 
-                  data={[
-                    { subject: 'Reading', average: 82, classAverage: 78 },
-                    { subject: 'Writing', average: 78, classAverage: 75 },
-                    { subject: 'Math', average: 85, classAverage: 80 },
-                    { subject: 'Science', average: 80, classAverage: 76 },
-                    { subject: 'Art', average: 90, classAverage: 88 },
-                    { subject: 'Music', average: 88, classAverage: 85 },
-                  ]}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
-
-      {/* Dialogs */}
+      
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Total Students</h3>
+          <p className="text-3xl font-bold">{students.length}</p>
+          <p className="text-sm text-gray-500">Currently enrolled</p>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Guardians</h3>
+          <p className="text-3xl font-bold">{parents.length}</p>
+          <p className="text-sm text-gray-500">Registered parents</p>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Average Age</h3>
+          <p className="text-3xl font-bold">7</p>
+          <p className="text-sm text-gray-500">Years</p>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg border shadow-sm">
+          <h3 className="text-sm font-medium text-gray-500">Attendance Rate</h3>
+          <p className="text-3xl font-bold">87%</p>
+          <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+            <div className="bg-green-600 h-2.5 rounded-full" style={{ width: '87%' }}></div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Student Directory */}
+      <div className="bg-white p-6 rounded-lg border shadow-sm">
+        <h2 className="text-xl font-semibold mb-4">Student Directory</h2>
+        
+        {/* Filters and Search */}
+        <div className="flex flex-col sm:flex-row justify-between mb-4 gap-4">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="bg-blue-50">All Students</Button>
+            <Button variant="outline">Pre-K</Button>
+            <Button variant="outline">Kindergarten</Button>
+            <Button variant="outline">Elementary</Button>
+          </div>
+          
+          <div className="flex gap-2">
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <Input
+                type="search"
+                placeholder="Search students..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-48 sm:w-64"
+              />
+              <Button type="submit" variant="outline">
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
+            <div className="flex gap-2">
+              <select className="px-3 py-2 bg-white border rounded-md text-sm">
+                <option>All Grades</option>
+              </select>
+              <select className="px-3 py-2 bg-white border rounded-md text-sm">
+                <option>All Statuses</option>
+              </select>
+              <Button variant="outline" size="icon">
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+        
+        {/* Students Table */}
+        <div className="border rounded-lg overflow-hidden">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Student
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  ID / Admission #
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date of Birth
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Parent/Guardian
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center">
+                    <div className="flex justify-center">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                    </div>
+                  </td>
+                </tr>
+              ) : students.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    No students found
+                  </td>
+                </tr>
+              ) : (
+                students.map((student) => (
+                  <tr 
+                    key={student.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => handleViewStudent(student)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-500">
+                          {student.first_name?.charAt(0)}{student.last_name?.charAt(0)}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {student.first_name} {student.last_name}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Class: {student.class_name || 'Not assigned'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{student.id}</div>
+                      <div className="text-sm text-gray-500">{student.admission_number}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{formatDate(student.date_of_birth)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{getParentName(student.parent_id)}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        Active
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button className="text-gray-400 hover:text-gray-500">
+                        •••
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      {/* Add Student Dialog */}
       {isAddDialogOpen && (
         <AddStudentDialog
           parents={parents}
@@ -546,16 +264,14 @@ export const Students = () => {
         />
       )}
       
-      {isDetailsDialogOpen && selectedStudent && (
+      {/* Student Details Dialog */}
+      {selectedStudent && (
         <StudentDetailsDialog
           student={selectedStudent}
           parentName={getParentName(selectedStudent.parent_id)}
-          onClose={() => {
-            setIsDetailsDialogOpen(false);
-            setSelectedStudent(null);
-          }}
+          onClose={() => setSelectedStudent(null)}
         />
       )}
-    </DashboardLayout>
+    </div>
   );
 };
