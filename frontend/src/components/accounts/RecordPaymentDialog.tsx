@@ -107,46 +107,45 @@ export const RecordPaymentDialog = ({
     return isValid;
   };
 
-  const handleSubmit = async () => {
-    // Validate form
-    if (!validateForm()) {
-      return;
-    }
+  // Complete handleSubmit function for RecordPaymentDialog.tsx
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // In a real implementation, you would call the API
-      // await dashboardApi.recordPayment(fee.id, amount, {
-      //   paymentMethod,
-      //   referenceNumber,
-      //   paymentDate,
-      //   notes
-      // });
+const handleSubmit = async () => {
+  // Validate form
+  if (!validateForm()) {
+    return;
+  }
 
-      // For demo, simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Show success message
-      setSuccess(true);
-      
-      // Notify parent component that payment was recorded
-      onPaymentRecorded(fee.id, amount);
-      
-      // Close dialog after 1.5 seconds
-      setTimeout(() => {
-        onClose();
-        setSuccess(false);
-      }, 1500);
-      
-    } catch (err: any) {
-      console.error('Error recording payment:', err);
-      setError(err.message || 'Failed to record payment. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    setLoading(true);
+    setError(null);
+    
+    // Call API to record payment
+    await dashboardApi.recordPayment(fee.id, amount, {
+      paymentMethod,
+      referenceNumber,
+      paymentDate,
+      notes
+    });
+    
+    // Show success message
+    setSuccess(true);
+    
+    // Notify parent component that payment was recorded
+    onPaymentRecorded(fee.id, amount);
+    
+    // Close dialog after a delay
+    setTimeout(() => {
+      onClose();
+      setSuccess(false);
+    }, 1000);
+    
+  } catch (err: any) {
+    console.error('Error recording payment:', err);
+    setError(err.message || 'Failed to record payment. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-UG', {

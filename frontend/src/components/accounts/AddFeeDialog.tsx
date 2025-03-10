@@ -226,23 +226,23 @@ export const AddFeeDialog = ({
       
       // Create fees based on active tab
       if (activeTab === 'single') {
-        // In a real app, we would call API
-        // await dashboardApi.createFee(parseInt(selectedStudentId), feeData);
+        // Call API to create fee
+        await dashboardApi.createFee(parseInt(selectedStudentId), feeData);
         console.log('Creating fee for student:', selectedStudentId, feeData);
       } else {
         // For batch mode
-        // In a real app, we would call API for each student or use batch endpoint
+        // Call API for each student
+        for (const studentId of selectedStudentIds) {
+          await dashboardApi.createFee(parseInt(studentId), feeData);
+        }
         console.log('Creating fees for students:', selectedStudentIds, feeData);
-        // for (const studentId of selectedStudentIds) {
-        //   await dashboardApi.createFee(parseInt(studentId), feeData);
-        // }
       }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Show success message
+      setSuccess(true);
       
       // Prepare fee data to return to parent
-      const feeData = {
+      const returnData = {
         student_id: activeTab === 'single' ? parseInt(selectedStudentId) : null,
         student_ids: activeTab === 'batch' ? selectedStudentIds.map(id => parseInt(id)) : null,
         description,
@@ -259,14 +259,11 @@ export const AddFeeDialog = ({
                 'Activities'
       };
       
-      // Show success message
-      setSuccess(true);
-      
       // Notify parent component
       setTimeout(() => {
-        onFeeAdded(feeData);
+        onFeeAdded(returnData);
         onClose();
-      }, 2000);
+      }, 1000);
       
     } catch (err: any) {
       console.error('Error creating fee:', err);

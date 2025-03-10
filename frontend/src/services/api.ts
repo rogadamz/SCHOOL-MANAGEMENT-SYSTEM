@@ -951,6 +951,15 @@ export const dashboardApi = {
       throw error;
     }
   },
+
+  deleteFee: async (feeId: number): Promise<void> => {
+    try {
+      await api.delete(`/fees/${feeId}`);
+    } catch (error) {
+      console.error(`Error deleting fee ${feeId}:`, error);
+      throw error;
+    }
+  },
   
   getFeeSummary: async (term?: string, academicYear?: string): Promise<FeeSummary> => {
     try {

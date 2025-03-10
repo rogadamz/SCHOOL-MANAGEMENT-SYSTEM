@@ -1,62 +1,89 @@
 // Create a new fee
-const createNewFee = (feeData) => {
-  // In a real implementation, this would call an API endpoint
-  const newFee = {
-    id: fees.length + 1,
-    ...feeData,
-    status: 'pending',
-    paid: 0,
-    selected: false,
-    category: feeData.category || 'Tuition',
-    payment_method: '-',
-    last_payment_date: null,
-    invoice_number: `INV-${new Date().getFullYear()}-${10000 + fees.length + 1}`
-  };
-  
-  // Update state with new fee
-  setFees([newFee, ...fees]);
-  
-  // Show success message
-  setActionSuccess("Fee created successfully");
-  
-  // Update financial summary
-  const newTotalAmount = financialSummary.totalAmount + newFee.amount;
-  setFinancialSummary({
-    ...financialSummary,
-    totalAmount: newTotalAmount,
-    totalBalance: newTotalAmount - financialSummary.totalPaid,
-    paymentRate: (financialSummary.totalPaid / newTotalAmount) * 100,
-    unpaidCount: financialSummary.unpaidCount + 1
-  });
+const createNewFee = async (feeData) => {
+  try {
+    // Call API to create fee in database
+    const response = await dashboardApi.createFee(feeData.student_id, {
+      amount: feeData.amount,
+      description: feeData.description,
+      due_date: feeData.due_date,
+      term: feeData.term,
+      academic_year: feeData.academic_year,
+      status: 'pending',
+      paid: 0
+    });
+    
+    // Get the new fee data from the response
+    const newFee = {
+      ...response,
+      selected: false,
+      category: feeData.category || 'Tuition',
+      payment_method: '-',
+      last_payment_date: null,
+      invoice_number: `INV-${new Date().getFullYear()}-${10000 + response.id}`
+    };
+    
+    // Update state with new fee
+    setFees([newFee, ...fees]);
+    
+    // Show success message
+    setActionSuccess("Fee created successfully");
+    
+    // Update financial summary
+    const newTotalAmount = financialSummary.totalAmount + newFee.amount;
+    setFinancialSummary({
+      ...financialSummary,
+      totalAmount: newTotalAmount,
+      totalBalance: newTotalAmount - financialSummary.totalPaid,
+      paymentRate: (financialSummary.totalPaid / newTotalAmount) * 100,
+      unpaidCount: financialSummary.unpaidCount + 1
+    });
+    
+    // Refresh data to ensure UI reflects database state
+    fetchData();
+  } catch (error) {
+    console.error('Error creating fee:', error);
+    setActionSuccess("Failed to create fee");
+  }
 };
 
 // Delete a fee
-const deleteFee = (feeId) => {
-  // Find the fee to be deleted
-  const feeToDelete = fees.find(fee => fee.id === feeId);
-  if (!feeToDelete) return;
-  
-  // Filter out the fee
-  const updatedFees = fees.filter(fee => fee.id !== feeId);
-  setFees(updatedFees);
-  
-  // Show success message
-  setActionSuccess("Fee deleted successfully");
-  
-  // Update financial summary
-  const newTotalAmount = financialSummary.totalAmount - feeToDelete.amount;
-  const newTotalPaid = financialSummary.totalPaid - feeToDelete.paid;
-  
-  setFinancialSummary({
-    ...financialSummary,
-    totalAmount: newTotalAmount,
-    totalPaid: newTotalPaid,
-    totalBalance: newTotalAmount - newTotalPaid,
-    paymentRate: newTotalAmount > 0 ? (newTotalPaid / newTotalAmount) * 100 : 0,
-    unpaidCount: feeToDelete.status === 'pending' ? financialSummary.unpaidCount - 1 : financialSummary.unpaidCount,
-    paidCount: feeToDelete.status === 'paid' ? financialSummary.paidCount - 1 : financialSummary.paidCount,
-    partialCount: feeToDelete.status === 'partial' ? financialSummary.partialCount - 1 : financialSummary.partialCount
-  });
+const deleteFee = async (feeId) => {
+  try {
+    // Find the fee to be deleted
+    const feeToDelete = fees.find(fee => fee.id === feeId);
+    if (!feeToDelete) return;
+    
+    // Call API to delete fee from database
+    await dashboardApi.deleteFee(feeId);
+    
+    // Filter out the fee from local state
+    const updatedFees = fees.filter(fee => fee.id !== feeId);
+    setFees(updatedFees);
+    
+    // Show success message
+    setActionSuccess("Fee deleted successfully");
+    
+    // Update financial summary
+    const newTotalAmount = financialSummary.totalAmount - feeToDelete.amount;
+    const newTotalPaid = financialSummary.totalPaid - feeToDelete.paid;
+    
+    setFinancialSummary({
+      ...financialSummary,
+      totalAmount: newTotalAmount,
+      totalPaid: newTotalPaid,
+      totalBalance: newTotalAmount - newTotalPaid,
+      paymentRate: newTotalAmount > 0 ? (newTotalPaid / newTotalAmount) * 100 : 0,
+      unpaidCount: feeToDelete.status === 'pending' ? financialSummary.unpaidCount - 1 : financialSummary.unpaidCount,
+      paidCount: feeToDelete.status === 'paid' ? financialSummary.paidCount - 1 : financialSummary.paidCount,
+      partialCount: feeToDelete.status === 'partial' ? financialSummary.partialCount - 1 : financialSummary.partialCount
+    });
+    
+    // Refresh data to ensure UI reflects database state
+    fetchData();
+  } catch (error) {
+    console.error(`Error deleting fee ${feeId}:`, error);
+    setActionSuccess("Failed to delete fee");
+  }
 };// frontend/src/pages/Accounts.tsx
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
@@ -1021,24 +1048,62 @@ return (
               
               {/* Export Options */}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <Download className="h-4 w-4 mr-2" />
-                    Export
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={exportSelectedToCsv}>
-                    Export as CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    Export as Excel
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    Export as PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+      <ChevronDown className="h-4 w-4 text-gray-600" />
+    </Button>
+  </DropdownMenuTrigger>
+  <DropdownMenuContent align="end">
+    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+    
+    <DropdownMenuItem 
+      onClick={() => handleRecordPayment(fee)} 
+      disabled={fee.status === 'paid'}
+    >
+      <DollarSign className="h-4 w-4 mr-2" />
+      Record Payment
+    </DropdownMenuItem>
+    
+    <DropdownMenuItem onClick={() => handleViewInvoice(fee)}>
+      <FileText className="h-4 w-4 mr-2" />
+      View Invoice
+    </DropdownMenuItem>
+    
+    <DropdownMenuItem onClick={() => {
+      // Handle print action
+      console.log("Printing invoice for:", fee);
+    }}>
+      <Printer className="h-4 w-4 mr-2" />
+      Print Invoice
+    </DropdownMenuItem>
+    
+    <DropdownMenuItem onClick={() => {
+      // Handle send reminder action
+      console.log("Sending reminder for:", fee);
+    }}>
+      <Mail className="h-4 w-4 mr-2" />
+      Send Reminder
+    </DropdownMenuItem>
+    
+    <DropdownMenuSeparator />
+    
+    <DropdownMenuItem onClick={() => {
+      // Handle edit action
+      console.log("Editing fee:", fee);
+    }}>
+      <Edit className="h-4 w-4 mr-2" />
+      Edit Details
+    </DropdownMenuItem>
+    
+    <DropdownMenuItem 
+      className="text-red-600"
+      onClick={() => deleteFee(fee.id)}
+    >
+      <Trash2 className="h-4 w-4 mr-2" />
+      Delete
+    </DropdownMenuItem>
+  </DropdownMenuContent>
+</DropdownMenu>
               
               {/* Refresh Button */}
               <Button variant="outline" onClick={fetchData}>

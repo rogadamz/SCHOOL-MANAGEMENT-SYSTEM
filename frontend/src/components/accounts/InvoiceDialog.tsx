@@ -134,7 +134,7 @@ export const InvoiceDialog = ({
         } else {
           throw new Error('Invoice element not found');
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error printing invoice:', err);
         setError(err.message || 'Failed to print invoice');
         setLoading(false);
@@ -190,7 +190,7 @@ export const InvoiceDialog = ({
       
       // Show success message
       setSuccess('Invoice downloaded successfully');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error downloading invoice:', err);
       setError(err.message || 'Failed to download invoice');
     } finally {
