@@ -24,14 +24,16 @@ interface AddFeeDialogProps {
   isOpen: boolean;
   onClose: () => void;
   students: Student[];
-  onFeeAdded: () => void;
+  onFeeAdded: (feeData: any) => void;
+  defaultFeePrices: Record<string, number>;
 }
 
 export const AddFeeDialog = ({
   isOpen,
   onClose,
   students,
-  onFeeAdded
+  onFeeAdded,
+  defaultFeePrices
 }: AddFeeDialogProps) => {
   const [activeTab, setActiveTab] = useState<string>('single');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -39,7 +41,7 @@ export const AddFeeDialog = ({
   const [selectAll, setSelectAll] = useState<boolean>(false);
   const [feeType, setFeeType] = useState<string>('tuition');
   const [description, setDescription] = useState<string>('');
-  const [amount, setAmount] = useState<number>(0);
+  const [amount, setAmount] = useState<number>(defaultFeePrices['Tuition'] || 0);
   const [dueDate, setDueDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [term, setTerm] = useState<string>('Term 1');
   const [academicYear, setAcademicYear] = useState<string>('2024-2025');
@@ -68,41 +70,45 @@ export const AddFeeDialog = ({
     }
   }, [isOpen]);
 
-  // Update description when fee type changes
+  // Update description and default amount when fee type changes
   useEffect(() => {
     let defaultDescription = '';
+    let defaultAmount = 0;
+    
     switch(feeType) {
       case 'tuition':
         defaultDescription = `Tuition Fee - ${term} ${academicYear}`;
-        setAmount(1500000); // 1,500,000 UGX
+        defaultAmount = defaultFeePrices['Tuition'] || 1500000;
         break;
       case 'transport':
         defaultDescription = `Transportation Fee - ${term} ${academicYear}`;
-        setAmount(300000); // 300,000 UGX
+        defaultAmount = defaultFeePrices['Transportation'] || 300000;
         break;
       case 'lab':
         defaultDescription = `Laboratory Fee - ${term} ${academicYear}`;
-        setAmount(150000); // 150,000 UGX
+        defaultAmount = defaultFeePrices['Lab Fees'] || 150000;
         break;
       case 'materials':
         defaultDescription = `Learning Materials - ${term} ${academicYear}`;
-        setAmount(100000); // 100,000 UGX
+        defaultAmount = defaultFeePrices['Materials'] || 100000;
         break;
       case 'activity':
         defaultDescription = `Activities Fee - ${term} ${academicYear}`;
-        setAmount(100000); // 100,000 UGX
+        defaultAmount = defaultFeePrices['Activities'] || 100000;
         break;
       case 'custom':
         // Don't change the description for custom fee type
         break;
       default:
         defaultDescription = '';
+        defaultAmount = 0;
     }
     
     if (feeType !== 'custom') {
       setDescription(defaultDescription);
+      setAmount(defaultAmount);
     }
-  }, [feeType, term, academicYear]);
+  }, [feeType, term, academicYear, defaultFeePrices]);
 
   // Toggle select all students
   useEffect(() => {
@@ -130,8 +136,10 @@ export const AddFeeDialog = ({
     setSelectedStudentIds([]);
     setSelectAll(false);
     setFeeType('tuition');
-    setDescription('Tuition Fee - Term 1 2024-2025');
-    setAmount(1500000);
+    
+    // Set default description and amount for tuition
+    setDescription(`Tuition Fee - Term 1 2024-2025`);
+    setAmount(defaultFeePrices['Tuition'] || 1500000);
     
     // Set due date to 14 days from now
     const dueDate = new Date();
@@ -212,6 +220,16 @@ export const AddFeeDialog = ({
       setLoading(true);
       setError(null);
       
+      // Map fee type to category name for consistency
+      const categoryMapping = {
+        'tuition': 'Tuition',
+        'transport': 'Transportation',
+        'lab': 'Lab Fees',
+        'materials': 'Materials',
+        'activity': 'Activities',
+        'custom': 'Custom'
+      };
+      
       // Prepare fee data
       const feeData = {
         description,
@@ -221,47 +239,39 @@ export const AddFeeDialog = ({
         academic_year: academicYear,
         notes,
         status: 'pending',
-        paid: 0
+        paid: 0,
+        category: categoryMapping[feeType] || 'Custom'
       };
       
       // Create fees based on active tab
       if (activeTab === 'single') {
-        // Call API to create fee
-        await dashboardApi.createFee(parseInt(selectedStudentId), feeData);
-        console.log('Creating fee for student:', selectedStudentId, feeData);
+        // Create fee data with student ID
+        const singleFeeData = {
+          ...feeData,
+          student_id: parseInt(selectedStudentId),
+        };
+        
+        // Notify parent component
+        onFeeAdded(singleFeeData);
+        
       } else {
-        // For batch mode
-        // Call API for each student
+        // For batch mode, create one fee per student
         for (const studentId of selectedStudentIds) {
-          await dashboardApi.createFee(parseInt(studentId), feeData);
+          const batchFeeData = {
+            ...feeData,
+            student_id: parseInt(studentId),
+          };
+          
+          // Notify parent component for each student
+          onFeeAdded(batchFeeData);
         }
-        console.log('Creating fees for students:', selectedStudentIds, feeData);
       }
       
       // Show success message
       setSuccess(true);
       
-      // Prepare fee data to return to parent
-      const returnData = {
-        student_id: activeTab === 'single' ? parseInt(selectedStudentId) : null,
-        student_ids: activeTab === 'batch' ? selectedStudentIds.map(id => parseInt(id)) : null,
-        description,
-        amount,
-        due_date: dueDate,
-        term,
-        academic_year: academicYear,
-        notes,
-        category: feeType === 'custom' ? 'Custom' : 
-                feeType === 'tuition' ? 'Tuition' :
-                feeType === 'transport' ? 'Transportation' :
-                feeType === 'lab' ? 'Lab Fees' :
-                feeType === 'materials' ? 'Materials' :
-                'Activities'
-      };
-      
-      // Notify parent component
+      // Close dialog after a delay
       setTimeout(() => {
-        onFeeAdded(returnData);
         onClose();
       }, 1000);
       
@@ -423,11 +433,11 @@ export const AddFeeDialog = ({
                         <SelectValue placeholder="Select fee type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="tuition">Tuition Fee</SelectItem>
-                        <SelectItem value="transport">Transportation Fee</SelectItem>
-                        <SelectItem value="lab">Laboratory Fee</SelectItem>
-                        <SelectItem value="materials">Learning Materials</SelectItem>
-                        <SelectItem value="activity">Activities Fee</SelectItem>
+                        <SelectItem value="tuition">Tuition Fee ({formatCurrency(defaultFeePrices['Tuition'] || 0)})</SelectItem>
+                        <SelectItem value="transport">Transportation Fee ({formatCurrency(defaultFeePrices['Transportation'] || 0)})</SelectItem>
+                        <SelectItem value="lab">Laboratory Fee ({formatCurrency(defaultFeePrices['Lab Fees'] || 0)})</SelectItem>
+                        <SelectItem value="materials">Learning Materials ({formatCurrency(defaultFeePrices['Materials'] || 0)})</SelectItem>
+                        <SelectItem value="activity">Activities Fee ({formatCurrency(defaultFeePrices['Activities'] || 0)})</SelectItem>
                         <SelectItem value="custom">Custom Fee</SelectItem>
                       </SelectContent>
                     </Select>
