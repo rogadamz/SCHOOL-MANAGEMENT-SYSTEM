@@ -33,7 +33,13 @@ export const AddFeeDialog = ({
   onClose,
   students,
   onFeeAdded,
-  defaultFeePrices
+  defaultFeePrices = {
+    'Tuition': 1500000,
+    'Transportation': 300000,
+    'Lab Fees': 150000,
+    'Materials': 100000,
+    'Activities': 100000
+  } // Provide default values to prevent errors
 }: AddFeeDialogProps) => {
   const [activeTab, setActiveTab] = useState<string>('single');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -221,7 +227,7 @@ export const AddFeeDialog = ({
       setError(null);
       
       // Map fee type to category name for consistency
-      const categoryMapping = {
+      const categoryMapping: Record<string, string> = {
         'tuition': 'Tuition',
         'transport': 'Transportation',
         'lab': 'Lab Fees',
