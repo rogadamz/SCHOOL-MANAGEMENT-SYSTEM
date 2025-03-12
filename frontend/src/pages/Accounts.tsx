@@ -10,7 +10,8 @@ import {
   DollarSign, CreditCard, Calendar, Search, 
   Filter, Download, Plus, Edit, Trash2, RotateCw, 
   AlertCircle, CheckCircle, ChevronDown,
-  FileText, Printer, Mail, ArrowUpDown
+  FileText, Printer, Mail, ArrowUpDown,
+  Settings, Save, RefreshCw
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -47,21 +48,23 @@ import { RecordPaymentDialog } from '@/components/accounts/RecordPaymentDialog';
 import { AddFeeDialog } from '@/components/accounts/AddFeeDialog';
 import { UpdateFeeDialog } from '@/components/accounts/UpdateFeeDialog';
 import { InvoiceDialog } from '@/components/accounts/InvoiceDialog';
+import { FinancialReports } from '@/components/accounts/FinancialReports';
+import { BatchPaymentDialog } from '@/components/accounts/BatchPaymentDialog';
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 // Import the ExtendedFee interface from api-extension
 import { ExtendedFee, financialApi } from '@/services/api-extension';
 
-/**
- * Fee type default values
- */
-const FEE_TYPE_DEFAULTS = {
-  'tuition': { amount: 1500000, description: "Tuition Fee" },
-  'transport': { amount: 300000, description: "Transportation Fee" },
-  'lab': { amount: 150000, description: "Laboratory Fee" },
-  'materials': { amount: 100000, description: "Learning Materials" },
-  'activity': { amount: 100000, description: "Activities Fee" },
-  'custom': { amount: 0, description: "" }
+// Default fee category prices for the system
+const DEFAULT_FEE_CATEGORIES = {
+  'Tuition': 1500000,
+  'Transportation': 300000,
+  'Lab Fees': 150000,
+  'Materials': 100000,
+  'Activities': 100000,
+  'Other': 0
 };
 
 /**
@@ -93,6 +96,7 @@ export function Accounts() {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [feeToDelete, setFeeToDelete] = useState<number | null>(null);
+  const [isBatchPaymentDialogOpen, setIsBatchPaymentDialogOpen] = useState(false);
   
   // Selection and pagination state
   const [selectedRows, setSelectedRows] = useState<number[]>([]);
@@ -103,9 +107,22 @@ export function Accounts() {
   // Filter state
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [dateRangeFilter, setDateRangeFilter] = useState<{start: string, end: string} | null>(null);
+  const [amountRangeFilter, setAmountRangeFilter] = useState<{min: number | null, max: number | null}>({ min: null, max: null });
   const [sortField, setSortField] = useState<string>('due_date');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // Settings state
+  const [defaultFeePrices, setDefaultFeePrices] = useState<Record<string, number>>(DEFAULT_FEE_CATEGORIES);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(['Cash', 'Bank Transfer', 'Mobile Money', 'Credit Card', 'Check']);
+  const [defaultDueDays, setDefaultDueDays] = useState<number>(14);
+  const [reminderSettings, setReminderSettings] = useState({
+    enableAutomaticReminders: true,
+    daysBeforeDue: 3,
+    daysAfterDue: 1,
+    reminderFrequency: 7, // days
+  });
+  const [isSettingsChanged, setIsSettingsChanged] = useState(false);
 
   // Financial summary state
   const [financialSummary, setFinancialSummary] = useState({
@@ -127,7 +144,13 @@ export function Accounts() {
   // Load data on component mount
   useEffect(() => {
     fetchData();
+    loadSettings();
   }, []);
+  
+  // Track settings changes
+  useEffect(() => {
+    setIsSettingsChanged(true);
+  }, [defaultFeePrices, paymentMethods, defaultDueDays, reminderSettings]);
 
   // Reset success message after 3 seconds
   useEffect(() => {
@@ -154,14 +177,19 @@ export function Accounts() {
       const [feesData, studentsData, summaryData, chartDataResponse] = await Promise.all([
         dashboardApi.getFees(),
         dashboardApi.getStudents(),
-        dashboardApi.getFeeSummary(),
+        financialApi.getFinancialSummary(),
         dashboardApi.getFeeChartData()
       ]);
       
       // Enhance fee data with additional properties
       const enhancedFees: ExtendedFee[] = await Promise.all(feesData.map(async fee => {
         // Get transactions for this fee to determine payment method and last payment date
-        const transactions = await financialApi.getFeeTransactions(fee.id);
+        let transactions = [];
+        try {
+          transactions = await financialApi.getFeeTransactions(fee.id);
+        } catch (error) {
+          console.error(`Error fetching transactions for fee ${fee.id}:`, error);
+        }
 
         return {
           ...fee,
@@ -174,19 +202,24 @@ export function Accounts() {
         };
       }));
       
-      setFees(enhancedFees);
+      // Sort fees by due date (newest first) for consistent display
+      const sortedFees = enhancedFees.sort((a, b) => 
+        new Date(b.due_date).getTime() - new Date(a.due_date).getTime()
+      );
+      
+      setFees(sortedFees);
       setStudents(studentsData);
       
       // Set financial summary
       setFinancialSummary({
-        totalAmount: summaryData.total_amount,
-        totalPaid: summaryData.total_paid,
-        totalBalance: summaryData.total_balance,
-        paymentRate: summaryData.payment_rate,
-        studentCount: summaryData.student_count,
-        paidCount: summaryData.paid_count,
-        partialCount: summaryData.partial_count,
-        unpaidCount: summaryData.unpaid_count,
+        totalAmount: summaryData.totalAmount,
+        totalPaid: summaryData.totalPaid,
+        totalBalance: summaryData.totalBalance,
+        paymentRate: summaryData.paymentRate,
+        studentCount: summaryData.studentCount,
+        paidCount: summaryData.paidCount,
+        partialCount: summaryData.partialCount,
+        unpaidCount: summaryData.unpaidCount,
         overdueAmount: calculateOverdueAmount(enhancedFees)
       });
       
@@ -197,12 +230,12 @@ export function Accounts() {
       const monthlyData = chartDataResponse.monthly_collection.map(item => ({
         month: item.month,
         amount: item.amount,
-        expected: item.amount * 1.1 // Estimated expected amount (this would come from the backend in a real app)
+        expected: item.amount * 1.2 // Estimated expected amount (this would come from the backend in a real app)
       }));
       
       // Process fee categories
       const categoryCounts = {};
-      enhancedFees.forEach(fee => {
+      sortedFees.forEach(fee => {
         const category = fee.category || 'Other';
         if (!categoryCounts[category]) {
           categoryCounts[category] = 0;
@@ -218,9 +251,9 @@ export function Accounts() {
       
       // Process payment methods
       const methodCounts = {};
-      enhancedFees.forEach(fee => {
-        if (fee.payment_method && fee.payment_method !== '-') {
-          const method = fee.payment_method;
+      sortedFees.forEach(fee => {
+        if (fee.payment_method && fee.payment_method !== '-' && fee.paid > 0) {
+          const method = fee.payment_method.charAt(0).toUpperCase() + fee.payment_method.slice(1);
           if (!methodCounts[method]) {
             methodCounts[method] = 0;
           }
@@ -244,6 +277,63 @@ export function Accounts() {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Load financial settings from local storage or API
+   */
+  const loadSettings = async () => {
+    try {
+      // In a real app, these would come from the backend API
+      // For now, we'll use localStorage as a persistent store
+      
+      const storedDefaultFeePrices = localStorage.getItem('defaultFeePrices');
+      if (storedDefaultFeePrices) {
+        setDefaultFeePrices(JSON.parse(storedDefaultFeePrices));
+      }
+      
+      const storedPaymentMethods = localStorage.getItem('paymentMethods');
+      if (storedPaymentMethods) {
+        setPaymentMethods(JSON.parse(storedPaymentMethods));
+      }
+      
+      const storedDefaultDueDays = localStorage.getItem('defaultDueDays');
+      if (storedDefaultDueDays) {
+        setDefaultDueDays(parseInt(storedDefaultDueDays));
+      }
+      
+      const storedReminderSettings = localStorage.getItem('reminderSettings');
+      if (storedReminderSettings) {
+        setReminderSettings(JSON.parse(storedReminderSettings));
+      }
+      
+      setIsSettingsChanged(false);
+      
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
+  /**
+   * Save financial settings to local storage or API
+   */
+  const saveSettings = async () => {
+    try {
+      // In a real app, these would be saved via the backend API
+      // For now, we'll use localStorage as a persistent store
+      
+      localStorage.setItem('defaultFeePrices', JSON.stringify(defaultFeePrices));
+      localStorage.setItem('paymentMethods', JSON.stringify(paymentMethods));
+      localStorage.setItem('defaultDueDays', defaultDueDays.toString());
+      localStorage.setItem('reminderSettings', JSON.stringify(reminderSettings));
+      
+      setIsSettingsChanged(false);
+      setActionSuccess("Settings saved successfully");
+      
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      setActionSuccess("Failed to save settings");
     }
   };
 
@@ -374,8 +464,8 @@ export function Accounts() {
     // Process payment methods
     const methodCounts = {};
     updatedFees.forEach(fee => {
-      if (fee.payment_method && fee.payment_method !== '-') {
-        const method = fee.payment_method;
+      if (fee.payment_method && fee.payment_method !== '-' && fee.paid > 0) {
+        const method = fee.payment_method.charAt(0).toUpperCase() + fee.payment_method.slice(1);
         if (!methodCounts[method]) {
           methodCounts[method] = 0;
         }
@@ -395,6 +485,33 @@ export function Accounts() {
       feeCategories: categoryData,
       paymentMethods: methodData
     }));
+  };
+
+  /**
+   * Update financial summary when fees change
+   */
+  const updateFinancialSummary = (updatedFees: ExtendedFee[]) => {
+    const totalAmount = updatedFees.reduce((sum, fee) => sum + fee.amount, 0);
+    const totalPaid = updatedFees.reduce((sum, fee) => sum + fee.paid, 0);
+    const totalBalance = totalAmount - totalPaid;
+    const paidCount = updatedFees.filter(fee => fee.status === 'paid').length;
+    const partialCount = updatedFees.filter(fee => fee.status === 'partial').length;
+    const unpaidCount = updatedFees.filter(fee => 
+      fee.status !== 'paid' && fee.status !== 'partial'
+    ).length;
+    const overdueAmount = calculateOverdueAmount(updatedFees);
+    
+    setFinancialSummary({
+      totalAmount,
+      totalPaid,
+      totalBalance,
+      paymentRate: totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0,
+      studentCount: financialSummary.studentCount, // Keep the student count unchanged
+      paidCount,
+      partialCount,
+      unpaidCount,
+      overdueAmount
+    });
   };
 
   // =========================================================================
@@ -428,25 +545,16 @@ export function Accounts() {
         transactions: []
       };
       
-      // Update state with new fee
+      // Update state with new fee (add to beginning for "most recent")
       const updatedFees = [newFee, ...fees];
       setFees(updatedFees);
       
       // Show success message
       setActionSuccess("Fee created successfully");
       
-      // Update financial summary
-      const newTotalAmount = financialSummary.totalAmount + newFee.amount;
-      setFinancialSummary({
-        ...financialSummary,
-        totalAmount: newTotalAmount,
-        totalBalance: newTotalAmount - financialSummary.totalPaid,
-        paymentRate: (financialSummary.totalPaid / newTotalAmount) * 100,
-        unpaidCount: financialSummary.unpaidCount + 1
-      });
-      
-      // Update charts
+      // Update charts and summary
       updateChartData(updatedFees);
+      updateFinancialSummary(updatedFees);
       
     } catch (error) {
       console.error('Error creating fee:', error);
@@ -462,14 +570,19 @@ export function Accounts() {
       // Call API to update fee in database
       await dashboardApi.updateFee(updatedFee.id, updatedFee);
       
+      // Find the current fee to preserve its extended properties
+      const currentFee = fees.find(f => f.id === updatedFee.id);
+      if (!currentFee) return;
+      
       // Update fee in state
       const updatedFees = fees.map(fee => 
         fee.id === updatedFee.id 
           ? { 
               ...fee, 
               ...updatedFee,
-              // Preserve extended properties
+              // Update category based on new description
               category: determineFeeCategory(updatedFee.description),
+              // Preserve other extended properties
               payment_method: fee.payment_method,
               last_payment_date: fee.last_payment_date,
               invoice_number: fee.invoice_number,
@@ -478,32 +591,19 @@ export function Accounts() {
           : fee
       );
       
-      setFees(updatedFees);
+      // Sort to ensure most recent edits appear at the top
+      const sortedFees = [...updatedFees].sort((a, b) => 
+        new Date(b.due_date).getTime() - new Date(a.due_date).getTime()
+      );
       
-      // Update charts
-      updateChartData(updatedFees);
+      setFees(sortedFees);
       
       // Show success message
       setActionSuccess("Fee updated successfully");
       
-      // Update financial summary
-      const totalAmount = updatedFees.reduce((sum, fee) => sum + fee.amount, 0);
-      const totalPaid = updatedFees.reduce((sum, fee) => sum + fee.paid, 0);
-      const paidCount = updatedFees.filter(fee => fee.status === 'paid').length;
-      const partialCount = updatedFees.filter(fee => fee.status === 'partial').length;
-      const unpaidCount = updatedFees.filter(fee => fee.status === 'pending').length;
-      
-      setFinancialSummary({
-        ...financialSummary,
-        totalAmount,
-        totalPaid,
-        totalBalance: totalAmount - totalPaid,
-        paymentRate: totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0,
-        paidCount,
-        partialCount,
-        unpaidCount,
-        overdueAmount: calculateOverdueAmount(updatedFees)
-      });
+      // Update charts and summary
+      updateChartData(sortedFees);
+      updateFinancialSummary(sortedFees);
       
     } catch (error) {
       console.error('Error updating fee:', error);
@@ -527,27 +627,12 @@ export function Accounts() {
       const updatedFees = fees.filter(fee => fee.id !== feeId);
       setFees(updatedFees);
       
-      // Update charts
-      updateChartData(updatedFees);
-      
       // Show success message
       setActionSuccess("Fee deleted successfully");
       
-      // Update financial summary
-      const newTotalAmount = financialSummary.totalAmount - feeToDelete.amount;
-      const newTotalPaid = financialSummary.totalPaid - feeToDelete.paid;
-      
-      setFinancialSummary({
-        ...financialSummary,
-        totalAmount: newTotalAmount,
-        totalPaid: newTotalPaid,
-        totalBalance: newTotalAmount - newTotalPaid,
-        paymentRate: newTotalAmount > 0 ? (newTotalPaid / newTotalAmount) * 100 : 0,
-        unpaidCount: feeToDelete.status === 'pending' ? financialSummary.unpaidCount - 1 : financialSummary.unpaidCount,
-        paidCount: feeToDelete.status === 'paid' ? financialSummary.paidCount - 1 : financialSummary.paidCount,
-        partialCount: feeToDelete.status === 'partial' ? financialSummary.partialCount - 1 : financialSummary.partialCount,
-        overdueAmount: calculateOverdueAmount(updatedFees)
-      });
+      // Update charts and summary
+      updateChartData(updatedFees);
+      updateFinancialSummary(updatedFees);
       
     } catch (error) {
       console.error(`Error deleting fee ${feeId}:`, error);
@@ -569,9 +654,6 @@ export function Accounts() {
       const updatedFees = fees.filter(fee => !feeIds.includes(fee.id));
       setFees(updatedFees);
       
-      // Update charts
-      updateChartData(updatedFees);
-      
       // Show success message
       setActionSuccess(`${feeIds.length} fees deleted successfully`);
       
@@ -579,24 +661,9 @@ export function Accounts() {
       setSelectedRows([]);
       setAllSelected(false);
       
-      // Update financial summary - recalculate all values
-      const totalAmount = updatedFees.reduce((sum, fee) => sum + fee.amount, 0);
-      const totalPaid = updatedFees.reduce((sum, fee) => sum + fee.paid, 0);
-      const paidCount = updatedFees.filter(fee => fee.status === 'paid').length;
-      const partialCount = updatedFees.filter(fee => fee.status === 'partial').length;
-      const unpaidCount = updatedFees.filter(fee => fee.status === 'pending').length;
-      
-      setFinancialSummary({
-        ...financialSummary,
-        totalAmount,
-        totalPaid,
-        totalBalance: totalAmount - totalPaid,
-        paymentRate: totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0,
-        paidCount,
-        partialCount,
-        unpaidCount,
-        overdueAmount: calculateOverdueAmount(updatedFees)
-      });
+      // Update charts and summary
+      updateChartData(updatedFees);
+      updateFinancialSummary(updatedFees);
       
     } catch (error) {
       console.error('Error deleting bulk fees:', error);
@@ -723,26 +790,20 @@ export function Accounts() {
       return fee;
     });
     
+    // Move the updated fee to the top of the list for recency
+    const feeIndex = updatedFees.findIndex(fee => fee.id === feeId);
+    if (feeIndex > -1) {
+      const updatedFee = updatedFees[feeIndex];
+      updatedFees.splice(feeIndex, 1);
+      updatedFees.unshift(updatedFee);
+    }
+    
     setFees(updatedFees);
-    updateChartData(updatedFees);
     setActionSuccess(`Payment of ${formatCurrency(amount)} recorded successfully`);
     
-    // Update financial summary
-    const totalPaid = updatedFees.reduce((sum, fee) => sum + fee.paid, 0);
-    const totalAmount = updatedFees.reduce((sum, fee) => sum + fee.amount, 0);
-    const paidCount = updatedFees.filter(fee => fee.status === 'paid').length;
-    const partialCount = updatedFees.filter(fee => fee.status === 'partial').length;
-    const unpaidCount = updatedFees.filter(fee => fee.status === 'pending').length;
-    
-    setFinancialSummary(prev => ({
-      ...prev,
-      totalPaid,
-      totalBalance: totalAmount - totalPaid,
-      paymentRate: (totalPaid / totalAmount) * 100,
-      paidCount,
-      partialCount,
-      unpaidCount
-    }));
+    // Update charts and summary
+    updateChartData(updatedFees);
+    updateFinancialSummary(updatedFees);
   };
 
   /**
@@ -771,6 +832,69 @@ export function Accounts() {
   };
 
   /**
+   * Handle batch payment recording
+   */
+  const handleBatchPaymentsRecorded = (payments: { feeId: number, amount: number }[]) => {
+    // Update fees in state
+    const updatedFees = [...fees];
+    const today = new Date().toISOString();
+    
+    // Process each payment
+    payments.forEach(payment => {
+      const feeIndex = updatedFees.findIndex(fee => fee.id === payment.feeId);
+      if (feeIndex === -1) return;
+      
+      const fee = updatedFees[feeIndex];
+      const newPaid = fee.paid + payment.amount;
+      const newStatus = newPaid >= fee.amount ? 'paid' : newPaid > 0 ? 'partial' : 'pending';
+      
+      // Add transaction to the fee's transactions array
+      const newTransactions = fee.transactions ? [
+        {
+          id: fee.transactions.length + 1,
+          fee_id: payment.feeId,
+          amount: payment.amount,
+          payment_method: 'cash', // From form in real implementation
+          payment_date: today,
+          recorded_by: 1,
+          reference_number: `RCT-${new Date().getFullYear()}-${1000 + payment.feeId}`
+        },
+        ...fee.transactions
+      ] : [{
+        id: 1,
+        fee_id: payment.feeId,
+        amount: payment.amount,
+        payment_method: 'cash',
+        payment_date: today,
+        recorded_by: 1,
+        reference_number: `RCT-${new Date().getFullYear()}-${1000 + payment.feeId}`
+      }];
+      
+      // Update the fee
+      updatedFees[feeIndex] = {
+        ...fee,
+        paid: newPaid,
+        status: newStatus,
+        last_payment_date: today,
+        payment_method: 'cash',
+        transactions: newTransactions
+      };
+      
+      // Move updated fees to the top for recency
+      const processed = updatedFees.splice(feeIndex, 1)[0];
+      updatedFees.unshift(processed);
+    });
+    
+    setFees(updatedFees);
+    setActionSuccess(`Batch payments recorded successfully`);
+    setSelectedRows([]);
+    
+    // Update charts and summary
+    updateChartData(updatedFees);
+    updateFinancialSummary(updatedFees);
+  };
+
+  /**
    * Execute bulk action on selected fees
    */
   const handleBulkAction = (action: string) => {
@@ -778,25 +902,47 @@ export function Accounts() {
     
     switch (action) {
       case 'payment':
-        // Open a bulk payment modal
-        setActionSuccess(`Bulk payment initiated for ${selectedRows.length} fees`);
+        // Open batch payment dialog
+        setIsBatchPaymentDialogOpen(true);
         break;
       case 'remind':
         // Send reminders to selected students
-        setActionSuccess(`Payment reminders sent to ${selectedRows.length} students`);
+        sendPaymentReminders();
         break;
       case 'export':
         exportSelectedToCsv();
         break;
       case 'print':
-        // Open print dialog for selected fees
-        setActionSuccess(`Preparing to print ${selectedRows.length} invoices`);
+        printSelectedInvoices();
         break;
       case 'delete':
         // Delete selected fees
         deleteBulkFees(selectedRows);
         break;
     }
+  };
+
+  /**
+   * Send payment reminders to selected students
+   */
+  const sendPaymentReminders = () => {
+    // In a real implementation, this would call the backend API
+    // For now, we'll simulate the operation
+    
+    const selectedFees = fees.filter(fee => selectedRows.includes(fee.id));
+    const uniqueStudentIds = [...new Set(selectedFees.map(fee => fee.student_id))];
+    
+    setActionSuccess(`Payment reminders sent to ${uniqueStudentIds.length} students`);
+  };
+
+  /**
+   * Print selected invoices
+   */
+  const printSelectedInvoices = () => {
+    // In a real implementation, this would generate and print invoices via the backend API
+    // For now, we'll simulate the operation
+    
+    setActionSuccess(`Preparing to print ${selectedRows.length} invoices`);
   };
 
   /**
@@ -826,6 +972,47 @@ export function Accounts() {
     document.body.removeChild(a);
     
     setActionSuccess(`Exported ${selectedFees.length} fees to CSV`);
+  };
+
+  /**
+   * Handle updating default fee price
+   */
+  const handleUpdateFeePrice = (category: string, price: number) => {
+    setDefaultFeePrices(prev => ({
+      ...prev,
+      [category]: price
+    }));
+  };
+
+  /**
+   * Handle adding a payment method
+   */
+  const handleAddPaymentMethod = (method: string) => {
+    if (!method || paymentMethods.includes(method)) return;
+    setPaymentMethods([...paymentMethods, method]);
+  };
+
+  /**
+   * Handle removing a payment method
+   */
+  const handleRemovePaymentMethod = (method: string) => {
+    setPaymentMethods(paymentMethods.filter(m => m !== method));
+  };
+
+  /**
+   * Reset settings to defaults
+   */
+  const resetSettings = () => {
+    setDefaultFeePrices(DEFAULT_FEE_CATEGORIES);
+    setPaymentMethods(['Cash', 'Bank Transfer', 'Mobile Money', 'Credit Card', 'Check']);
+    setDefaultDueDays(14);
+    setReminderSettings({
+      enableAutomaticReminders: true,
+      daysBeforeDue: 3,
+      daysAfterDue: 1,
+      reminderFrequency: 7,
+    });
+    setIsSettingsChanged(true);
   };
 
   // =========================================================================
@@ -866,8 +1053,20 @@ export function Accounts() {
         matchesDateRange = feeDate <= endDate;
       }
     }
+    
+    // Amount range filter
+    let matchesAmountRange = true;
+    if (amountRangeFilter.min !== null || amountRangeFilter.max !== null) {
+      if (amountRangeFilter.min !== null && amountRangeFilter.max !== null) {
+        matchesAmountRange = fee.amount >= amountRangeFilter.min && fee.amount <= amountRangeFilter.max;
+      } else if (amountRangeFilter.min !== null) {
+        matchesAmountRange = fee.amount >= amountRangeFilter.min;
+      } else if (amountRangeFilter.max !== null) {
+        matchesAmountRange = fee.amount <= amountRangeFilter.max;
+      }
+    }
       
-    return matchesStatus && matchesSearch && matchesCategory && matchesDateRange;
+    return matchesStatus && matchesSearch && matchesCategory && matchesDateRange && matchesAmountRange;
   });
 
   /**
@@ -1028,6 +1227,9 @@ export function Accounts() {
     
     return pages;
   };
+
+  // Get selected fees for batch operations
+  const selectedFeesData = fees.filter(fee => selectedRows.includes(fee.id));
 
   // =========================================================================
   // RENDER
@@ -1292,6 +1494,7 @@ export function Accounts() {
                         </td>
                       </tr>
                     ) : (
+                      // Show only 5 most recent transactions (fees are already sorted by recency)
                       fees.slice(0, 5).map((fee) => (
                         <tr key={fee.id} className="border-b hover:bg-gray-50">
                           <td className="py-3 px-4">{getStudentName(fee.student_id)}</td>
@@ -1391,6 +1594,7 @@ export function Accounts() {
                             <SelectItem value="Lab Fees">Lab Fees</SelectItem>
                             <SelectItem value="Materials">Materials</SelectItem>
                             <SelectItem value="Activities">Activities</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1402,6 +1606,7 @@ export function Accounts() {
                           <Input
                             type="date"
                             placeholder="Start date"
+                            value={dateRangeFilter?.start || ''}
                             onChange={(e) => setDateRangeFilter({
                               start: e.target.value,
                               end: dateRangeFilter?.end || ''
@@ -1410,6 +1615,7 @@ export function Accounts() {
                           <Input
                             type="date"
                             placeholder="End date"
+                            value={dateRangeFilter?.end || ''}
                             onChange={(e) => setDateRangeFilter({
                               start: dateRangeFilter?.start || '',
                               end: e.target.value
@@ -1422,8 +1628,24 @@ export function Accounts() {
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Amount Range</label>
                         <div className="grid grid-cols-2 gap-2">
-                          <Input type="number" placeholder="Min amount" />
-                          <Input type="number" placeholder="Max amount" />
+                          <Input 
+                            type="number" 
+                            placeholder="Min amount" 
+                            value={amountRangeFilter.min !== null ? amountRangeFilter.min : ''}
+                            onChange={(e) => setAmountRangeFilter({
+                              ...amountRangeFilter,
+                              min: e.target.value ? parseInt(e.target.value) : null
+                            })}
+                          />
+                          <Input 
+                            type="number" 
+                            placeholder="Max amount" 
+                            value={amountRangeFilter.max !== null ? amountRangeFilter.max : ''}
+                            onChange={(e) => setAmountRangeFilter({
+                              ...amountRangeFilter,
+                              max: e.target.value ? parseInt(e.target.value) : null
+                            })}
+                          />
                         </div>
                       </div>
                       
@@ -1432,18 +1654,19 @@ export function Accounts() {
                         <Button variant="outline" size="sm" onClick={() => {
                           setCategoryFilter('all');
                           setDateRangeFilter(null);
+                          setAmountRangeFilter({ min: null, max: null });
                         }}>
                           Reset
                         </Button>
-                        <Button size="sm">Apply Filters</Button>
                       </div>
                     </div>
                   </PopoverContent>
                 </Popover>
                 
-                {/* Export Options */}
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <ChevronDown className="h-4 w-4 text-gray-600" />
+                {/* Export Button */}
+                <Button variant="outline" onClick={() => exportSelectedToCsv()}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
                 </Button>
                 
                 {/* Refresh Button */}
@@ -1746,17 +1969,248 @@ export function Accounts() {
           </Tabs>
         </TabsContent>
 
-        {/* FINANCIAL REPORTS TAB and SETTINGS TAB are omitted for brevity */}
+        {/* FINANCIAL REPORTS TAB */}
         <TabsContent value="reports">
-          <div className="text-center p-8 text-gray-500">
-            Financial Reports functionality would be implemented here.
-          </div>
+          <FinancialReports />
         </TabsContent>
         
-        <TabsContent value="settings">
-          <div className="text-center p-8 text-gray-500">
-            Financial Settings functionality would be implemented here.
-          </div>
+        {/* SETTINGS TAB */}
+        <TabsContent value="settings" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Financial Settings</CardTitle>
+              <CardDescription>Configure fee categories, payment methods, and notification settings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Fee Categories Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Default Fee Amounts</h3>
+                <p className="text-sm text-gray-500">
+                  Set default fee amounts for each category. These will be used as suggestions when creating new fees.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {Object.entries(defaultFeePrices).map(([category, price]) => (
+                    <div key={category} className="flex items-center space-x-4">
+                      <div className="flex-1">
+                        <Label htmlFor={`fee-${category}`}>{category}</Label>
+                        <div className="relative mt-1">
+                          <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                            UGX
+                          </span>
+                          <Input
+                            id={`fee-${category}`}
+                            type="number"
+                            className="pl-12"
+                            value={price}
+                            onChange={(e) => handleUpdateFeePrice(category, parseInt(e.target.value))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Payment Methods Section */}
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="text-lg font-medium">Payment Methods</h3>
+                <p className="text-sm text-gray-500">
+                  Configure the payment methods available in the system.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="payment-methods">Available Payment Methods</Label>
+                    <div className="border rounded-md p-4 mt-1 max-h-[200px] overflow-y-auto space-y-2">
+                      {paymentMethods.map((method) => (
+                        <div key={method} className="flex items-center justify-between">
+                          <span>{method}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-red-500"
+                            onClick={() => handleRemovePaymentMethod(method)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      {paymentMethods.length === 0 && (
+                        <p className="text-gray-500 text-sm">No payment methods configured.</p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="new-method">Add Payment Method</Label>
+                    <div className="flex mt-1 space-x-2">
+                      <Input 
+                        id="new-method" 
+                        placeholder="Enter new method" 
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && e.currentTarget.value) {
+                            handleAddPaymentMethod(e.currentTarget.value);
+                            e.currentTarget.value = '';
+                          }
+                        }}
+                      />
+                      <Button 
+                        onClick={() => {
+                          const input = document.getElementById('new-method') as HTMLInputElement;
+                          if (input.value) {
+                            handleAddPaymentMethod(input.value);
+                            input.value = '';
+                          }
+                        }}
+                      >
+                        Add
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Due Date Settings Section */}
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="text-lg font-medium">Due Date Settings</h3>
+                <p className="text-sm text-gray-500">
+                  Set the default number of days until fee payments are due.
+                </p>
+                
+                <div className="flex items-center space-x-4 max-w-md">
+                  <Label htmlFor="default-due-days" className="min-w-[180px]">Default Due Days:</Label>
+                  <Input
+                    id="default-due-days"
+                    type="number"
+                    min="1"
+                    max="90"
+                    value={defaultDueDays}
+                    onChange={(e) => setDefaultDueDays(parseInt(e.target.value))}
+                  />
+                </div>
+              </div>
+              
+              {/* Payment Reminder Settings */}
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="text-lg font-medium">Payment Reminders</h3>
+                <p className="text-sm text-gray-500">
+                  Configure automated payment reminder notifications.
+                </p>
+                
+                <div className="space-y-4 max-w-lg">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="enable-reminders" 
+                      checked={reminderSettings.enableAutomaticReminders}
+                      onCheckedChange={(checked) => 
+                        setReminderSettings({
+                          ...reminderSettings,
+                          enableAutomaticReminders: !!checked
+                        })
+                      }
+                    />
+                    <Label htmlFor="enable-reminders">Enable automatic payment reminders</Label>
+                  </div>
+                  
+                  <div className="space-y-2 pl-6">
+                    <div className="flex items-center space-x-4">
+                      <Label htmlFor="days-before" className="min-w-[180px]">Days before due date:</Label>
+                      <Input
+                        id="days-before"
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={reminderSettings.daysBeforeDue}
+                        onChange={(e) => 
+                          setReminderSettings({
+                            ...reminderSettings,
+                            daysBeforeDue: parseInt(e.target.value)
+                          })
+                        }
+                        disabled={!reminderSettings.enableAutomaticReminders}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                      <Label htmlFor="days-after" className="min-w-[180px]">Days after due date:</Label>
+                      <Input
+                        id="days-after"
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={reminderSettings.daysAfterDue}
+                        onChange={(e) => 
+                          setReminderSettings({
+                            ...reminderSettings,
+                            daysAfterDue: parseInt(e.target.value)
+                          })
+                        }
+                        disabled={!reminderSettings.enableAutomaticReminders}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center space-x-4">
+                      <Label htmlFor="reminder-frequency" className="min-w-[180px]">Reminder frequency (days):</Label>
+                      <Input
+                        id="reminder-frequency"
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={reminderSettings.reminderFrequency}
+                        onChange={(e) => 
+                          setReminderSettings({
+                            ...reminderSettings,
+                            reminderFrequency: parseInt(e.target.value)
+                          })
+                        }
+                        disabled={!reminderSettings.enableAutomaticReminders}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Invoice Template Settings */}
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="text-lg font-medium">Invoice Template</h3>
+                <p className="text-sm text-gray-500">
+                  Customize the invoice template with school information and terms.
+                </p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="invoice-notes">Default Invoice Terms & Conditions</Label>
+                    <Textarea 
+                      id="invoice-notes"
+                      placeholder="Enter default terms and conditions for invoices"
+                      className="mt-1 h-24"
+                      defaultValue="1. All fees are to be paid by the due date.
+2. Late payments may incur a 5% surcharge.
+3. For payment plans, please contact the accounts office.
+4. All payments are non-refundable."
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <div className="px-6 py-4 flex justify-between border-t">
+              <Button variant="outline" onClick={resetSettings}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reset to Defaults
+              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="primary" 
+                  onClick={saveSettings}
+                  disabled={!isSettingsChanged}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Settings
+                </Button>
+              </div>
+            </div>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -1773,9 +2227,9 @@ export function Accounts() {
           
           <UpdateFeeDialog
             fee={selectedFee}
-            isOpen={isUpdateFeeModalOpen}
             onClose={() => setIsUpdateFeeModalOpen(false)}
             onUpdate={handleFeeUpdated}
+            isOpen={isUpdateFeeModalOpen}
           />
           
           <InvoiceDialog
@@ -1792,7 +2246,66 @@ export function Accounts() {
         onClose={() => setIsAddFeeModalOpen(false)}
         students={students}
         onFeeAdded={handleFeeAdded}
+        defaultFeePrices={defaultFeePrices}
       />
+      
+      {/* Batch Payment Dialog */}
+      {selectedRows.length > 0 && (
+        <BatchPaymentDialog
+          isOpen={isBatchPaymentDialogOpen}
+          onClose={() => setIsBatchPaymentDialogOpen(false)}
+          fees={selectedFeesData}
+          selectedFeeIds={selectedRows}
+          onPaymentsRecorded={handleBatchPaymentsRecorded}
+          getStudentName={getStudentName}
+        />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this fee record and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDeleteFee}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}isOpen={isInvoiceModalOpen}
+            onClose={() => setIsInvoiceModalOpen(false)}
+            getStudentName={getStudentName}
+          />
+        </>
+      )}
+      
+      <AddFeeDialog
+        isOpen={isAddFeeModalOpen}
+        onClose={() => setIsAddFeeModalOpen(false)}
+        students={students}
+        onFeeAdded={handleFeeAdded}
+        defaultFeePrices={defaultFeePrices}
+      />
+      
+      {/* Batch Payment Dialog */}
+      {selectedRows.length > 0 && (
+        <BatchPaymentDialog
+          isOpen={isBatchPaymentDialogOpen}
+          onClose={() => setIsBatchPaymentDialogOpen(false)}
+          fees={selectedFeesData}
+          selectedFeeIds={selectedRows}
+          onPaymentsRecorded={handleBatchPaymentsRecorded}
+          getStudentName={getStudentName}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

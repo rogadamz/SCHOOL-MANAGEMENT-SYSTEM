@@ -33,13 +33,7 @@ export const AddFeeDialog = ({
   onClose,
   students,
   onFeeAdded,
-  defaultFeePrices = {
-    'Tuition': 1500000,
-    'Transportation': 300000,
-    'Lab Fees': 150000,
-    'Materials': 100000,
-    'Activities': 100000
-  } // Provide default values to prevent errors
+  defaultFeePrices
 }: AddFeeDialogProps) => {
   const [activeTab, setActiveTab] = useState<string>('single');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -47,7 +41,7 @@ export const AddFeeDialog = ({
   const [selectAll, setSelectAll] = useState<boolean>(false);
   const [feeType, setFeeType] = useState<string>('tuition');
   const [description, setDescription] = useState<string>('');
-  const [amount, setAmount] = useState<number>(defaultFeePrices['Tuition'] || 0);
+  const [amount, setAmount] = useState<number>(0);
   const [dueDate, setDueDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [term, setTerm] = useState<string>('Term 1');
   const [academicYear, setAcademicYear] = useState<string>('2024-2025');
@@ -57,6 +51,7 @@ export const AddFeeDialog = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [success, setSuccess] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [userEditedAmount, setUserEditedAmount] = useState<boolean>(false);
   
   // Validation states
   const [errors, setErrors] = useState<{
@@ -74,47 +69,80 @@ export const AddFeeDialog = ({
     if (isOpen) {
       resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, defaultFeePrices]);
 
   // Update description and default amount when fee type changes
   useEffect(() => {
-    let defaultDescription = '';
-    let defaultAmount = 0;
-    
-    switch(feeType) {
-      case 'tuition':
-        defaultDescription = `Tuition Fee - ${term} ${academicYear}`;
-        defaultAmount = defaultFeePrices['Tuition'] || 1500000;
-        break;
-      case 'transport':
-        defaultDescription = `Transportation Fee - ${term} ${academicYear}`;
-        defaultAmount = defaultFeePrices['Transportation'] || 300000;
-        break;
-      case 'lab':
-        defaultDescription = `Laboratory Fee - ${term} ${academicYear}`;
-        defaultAmount = defaultFeePrices['Lab Fees'] || 150000;
-        break;
-      case 'materials':
-        defaultDescription = `Learning Materials - ${term} ${academicYear}`;
-        defaultAmount = defaultFeePrices['Materials'] || 100000;
-        break;
-      case 'activity':
-        defaultDescription = `Activities Fee - ${term} ${academicYear}`;
-        defaultAmount = defaultFeePrices['Activities'] || 100000;
-        break;
-      case 'custom':
-        // Don't change the description for custom fee type
-        break;
-      default:
-        defaultDescription = '';
-        defaultAmount = 0;
+    if (userEditedAmount) {
+      // If user manually edited amount, only update description
+      let defaultDescription = '';
+      
+      switch(feeType) {
+        case 'tuition':
+          defaultDescription = `Tuition Fee - ${term} ${academicYear}`;
+          break;
+        case 'transport':
+          defaultDescription = `Transportation Fee - ${term} ${academicYear}`;
+          break;
+        case 'lab':
+          defaultDescription = `Laboratory Fee - ${term} ${academicYear}`;
+          break;
+        case 'materials':
+          defaultDescription = `Learning Materials - ${term} ${academicYear}`;
+          break;
+        case 'activity':
+          defaultDescription = `Activities Fee - ${term} ${academicYear}`;
+          break;
+        case 'custom':
+          // Don't change the description for custom fee type
+          return;
+        default:
+          defaultDescription = '';
+      }
+      
+      if (feeType !== 'custom') {
+        setDescription(defaultDescription);
+      }
+    } else {
+      // If user hasn't manually edited amount, update both description and amount
+      let defaultDescription = '';
+      let defaultAmount = 0;
+      
+      switch(feeType) {
+        case 'tuition':
+          defaultDescription = `Tuition Fee - ${term} ${academicYear}`;
+          defaultAmount = defaultFeePrices['Tuition'] || 1500000;
+          break;
+        case 'transport':
+          defaultDescription = `Transportation Fee - ${term} ${academicYear}`;
+          defaultAmount = defaultFeePrices['Transportation'] || 300000;
+          break;
+        case 'lab':
+          defaultDescription = `Laboratory Fee - ${term} ${academicYear}`;
+          defaultAmount = defaultFeePrices['Lab Fees'] || 150000;
+          break;
+        case 'materials':
+          defaultDescription = `Learning Materials - ${term} ${academicYear}`;
+          defaultAmount = defaultFeePrices['Materials'] || 100000;
+          break;
+        case 'activity':
+          defaultDescription = `Activities Fee - ${term} ${academicYear}`;
+          defaultAmount = defaultFeePrices['Activities'] || 100000;
+          break;
+        case 'custom':
+          // For custom, don't set defaults
+          break;
+        default:
+          defaultDescription = '';
+          defaultAmount = 0;
+      }
+      
+      if (feeType !== 'custom') {
+        setDescription(defaultDescription);
+        setAmount(defaultAmount);
+      }
     }
-    
-    if (feeType !== 'custom') {
-      setDescription(defaultDescription);
-      setAmount(defaultAmount);
-    }
-  }, [feeType, term, academicYear, defaultFeePrices]);
+  }, [feeType, term, academicYear, defaultFeePrices, userEditedAmount]);
 
   // Toggle select all students
   useEffect(() => {
@@ -142,6 +170,7 @@ export const AddFeeDialog = ({
     setSelectedStudentIds([]);
     setSelectAll(false);
     setFeeType('tuition');
+    setUserEditedAmount(false);
     
     // Set default description and amount for tuition
     setDescription(`Tuition Fee - Term 1 2024-2025`);
@@ -227,7 +256,7 @@ export const AddFeeDialog = ({
       setError(null);
       
       // Map fee type to category name for consistency
-      const categoryMapping: Record<string, string> = {
+      const categoryMapping = {
         'tuition': 'Tuition',
         'transport': 'Transportation',
         'lab': 'Lab Fees',
@@ -279,7 +308,7 @@ export const AddFeeDialog = ({
       // Close dialog after a delay
       setTimeout(() => {
         onClose();
-      }, 1000);
+      }, 1500);
       
     } catch (err: any) {
       console.error('Error creating fee:', err);
@@ -303,6 +332,12 @@ export const AddFeeDialog = ({
   const getStudentName = (id: string) => {
     const student = students.find(s => s.id.toString() === id);
     return student ? `${student.first_name} ${student.last_name}` : 'Unknown Student';
+  };
+
+  // Handle amount change with tracking user edits
+  const handleAmountChange = (newAmount: number) => {
+    setAmount(newAmount);
+    setUserEditedAmount(true);
   };
 
   return (
@@ -434,16 +469,20 @@ export const AddFeeDialog = ({
                 <div className="space-y-4 mt-6">
                   <div className="space-y-2">
                     <Label htmlFor="feeType">Fee Type</Label>
-                    <Select value={feeType} onValueChange={setFeeType}>
+                    <Select value={feeType} onValueChange={(value) => {
+                      setFeeType(value);
+                      // Reset user edited flag when changing fee type
+                      setUserEditedAmount(false);
+                    }}>
                       <SelectTrigger id="feeType">
                         <SelectValue placeholder="Select fee type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="tuition">Tuition Fee ({formatCurrency(defaultFeePrices['Tuition'] || 0)})</SelectItem>
-                        <SelectItem value="transport">Transportation Fee ({formatCurrency(defaultFeePrices['Transportation'] || 0)})</SelectItem>
-                        <SelectItem value="lab">Laboratory Fee ({formatCurrency(defaultFeePrices['Lab Fees'] || 0)})</SelectItem>
-                        <SelectItem value="materials">Learning Materials ({formatCurrency(defaultFeePrices['Materials'] || 0)})</SelectItem>
-                        <SelectItem value="activity">Activities Fee ({formatCurrency(defaultFeePrices['Activities'] || 0)})</SelectItem>
+                        <SelectItem value="tuition">Tuition Fee ({formatCurrency(defaultFeePrices['Tuition'] || 1500000)})</SelectItem>
+                        <SelectItem value="transport">Transportation Fee ({formatCurrency(defaultFeePrices['Transportation'] || 300000)})</SelectItem>
+                        <SelectItem value="lab">Laboratory Fee ({formatCurrency(defaultFeePrices['Lab Fees'] || 150000)})</SelectItem>
+                        <SelectItem value="materials">Learning Materials ({formatCurrency(defaultFeePrices['Materials'] || 100000)})</SelectItem>
+                        <SelectItem value="activity">Activities Fee ({formatCurrency(defaultFeePrices['Activities'] || 100000)})</SelectItem>
                         <SelectItem value="custom">Custom Fee</SelectItem>
                       </SelectContent>
                     </Select>
@@ -476,7 +515,7 @@ export const AddFeeDialog = ({
                         value={amount || ''}
                         onChange={(e) => {
                           const value = parseFloat(e.target.value);
-                          setAmount(isNaN(value) ? 0 : value);
+                          handleAmountChange(isNaN(value) ? 0 : value);
                         }}
                         placeholder="Enter fee amount"
                       />
