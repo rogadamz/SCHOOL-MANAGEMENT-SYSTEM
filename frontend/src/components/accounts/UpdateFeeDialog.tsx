@@ -18,9 +18,10 @@ interface UpdateFeeDialogProps {
   fee: Fee;
   onClose: () => void;
   onUpdate: (fee: any) => void;
+  isOpen: boolean; // Add this line
 }
 
-export const UpdateFeeDialog = ({ fee, onClose, onUpdate }: UpdateFeeDialogProps) => {
+export const UpdateFeeDialog = ({ fee, onClose, onUpdate, isOpen}: UpdateFeeDialogProps) => {
   const [amount, setAmount] = useState(fee.amount.toString());
   const [description, setDescription] = useState(fee.description);
   const [dueDate, setDueDate] = useState(fee.due_date.split('T')[0]);
@@ -84,7 +85,7 @@ export const UpdateFeeDialog = ({ fee, onClose, onUpdate }: UpdateFeeDialogProps
   };
 
   return (
-    <Dialog open={true} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Update Fee</DialogTitle>

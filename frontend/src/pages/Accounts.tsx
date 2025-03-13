@@ -10,8 +10,7 @@ import {
   DollarSign, CreditCard, Calendar, Search, 
   Filter, Download, Plus, Edit, Trash2, RotateCw, 
   AlertCircle, CheckCircle, ChevronDown,
-  FileText, Printer, Mail, ArrowUpDown,
-  Settings, Save, RefreshCw
+  FileText, Printer, Mail, ArrowUpDown, Save, RefreshCw
 } from 'lucide-react';
 import { 
   DropdownMenu,
@@ -55,7 +54,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 // Import the ExtendedFee interface from api-extension
-import { ExtendedFee, financialApi } from '@/services/api-extension';
+import { ExtendedFee, FeeTransaction, financialApi } from '@/services/api-extension';
 
 // Default fee category prices for the system
 const DEFAULT_FEE_CATEGORIES = {
@@ -184,7 +183,7 @@ export function Accounts() {
       // Enhance fee data with additional properties
       const enhancedFees: ExtendedFee[] = await Promise.all(feesData.map(async fee => {
         // Get transactions for this fee to determine payment method and last payment date
-        let transactions = [];
+        let transactions: FeeTransaction[] = [];
         try {
           transactions = await financialApi.getFeeTransactions(fee.id);
         } catch (error) {
@@ -234,7 +233,7 @@ export function Accounts() {
       }));
       
       // Process fee categories
-      const categoryCounts = {};
+      const categoryCounts: Record<string, number> = {};
       sortedFees.forEach(fee => {
         const category = fee.category || 'Other';
         if (!categoryCounts[category]) {
@@ -250,7 +249,7 @@ export function Accounts() {
       }));
       
       // Process payment methods
-      const methodCounts = {};
+      const methodCounts: Record<string, number> = {};
       sortedFees.forEach(fee => {
         if (fee.payment_method && fee.payment_method !== '-' && fee.paid > 0) {
           const method = fee.payment_method.charAt(0).toUpperCase() + fee.payment_method.slice(1);
@@ -446,7 +445,7 @@ export function Accounts() {
     const colors = ['#2563eb', '#16a34a', '#dc2626', '#9333ea', '#f97316'];
     
     // Process fee categories
-    const categoryCounts = {};
+    const categoryCounts: Record<string, number> = {};
     updatedFees.forEach(fee => {
       const category = fee.category || 'Other';
       if (!categoryCounts[category]) {
@@ -462,7 +461,7 @@ export function Accounts() {
     }));
     
     // Process payment methods
-    const methodCounts = {};
+    const methodCounts: Record<string, number> = {};
     updatedFees.forEach(fee => {
       if (fee.payment_method && fee.payment_method !== '-' && fee.paid > 0) {
         const method = fee.payment_method.charAt(0).toUpperCase() + fee.payment_method.slice(1);
@@ -521,7 +520,16 @@ export function Accounts() {
   /**
    * Create a new fee
    */
-  const createNewFee = async (feeData) => {
+  const createNewFee = async (feeData: {
+    student_id: number;
+    amount: number;
+    description: string;
+    due_date: string;
+    term: string;
+    academic_year: string;
+    category?: string;
+    notes?: string;
+  }) => {
     try {
       // Call API to create fee in database
       const response = await dashboardApi.createFee(feeData.student_id, {
@@ -817,7 +825,16 @@ export function Accounts() {
   /**
    * Handle fee added
    */
-  const handleFeeAdded = (feeData) => {
+  const handleFeeAdded = (feeData: {
+    student_id: number;
+    amount: number;
+    description: string;
+    due_date: string;
+    term: string;
+    academic_year: string;
+    category?: string;
+    notes?: string;
+  }) => {
     createNewFee(feeData);
     setActionSuccess("Fee created successfully");
     setSelectedRows([]);
@@ -826,7 +843,7 @@ export function Accounts() {
   /**
    * Handle fee updated
    */
-  const handleFeeUpdated = (fee) => {
+  const handleFeeUpdated = (fee: Fee) => {
     updateFee(fee);
     setSelectedRows([]);
   };
@@ -2200,14 +2217,14 @@ export function Accounts() {
                 Reset to Defaults
               </Button>
               <div className="flex space-x-2">
-                <Button 
-                  variant="primary" 
-                  onClick={saveSettings}
-                  disabled={!isSettingsChanged}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Settings
-                </Button>
+              <Button
+                variant="default"
+                onClick={saveSettings}
+                disabled={!isSettingsChanged}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save Settings
+              </Button>
               </div>
             </div>
           </Card>
@@ -2235,52 +2252,6 @@ export function Accounts() {
           <InvoiceDialog
             fee={selectedFee}
             isOpen={isInvoiceModalOpen}
-            onClose={() => setIsInvoiceModalOpen(false)}
-            getStudentName={getStudentName}
-          />
-        </>
-      )}
-      
-      <AddFeeDialog
-        isOpen={isAddFeeModalOpen}
-        onClose={() => setIsAddFeeModalOpen(false)}
-        students={students}
-        onFeeAdded={handleFeeAdded}
-        defaultFeePrices={defaultFeePrices}
-      />
-      
-      {/* Batch Payment Dialog */}
-      {selectedRows.length > 0 && (
-        <BatchPaymentDialog
-          isOpen={isBatchPaymentDialogOpen}
-          onClose={() => setIsBatchPaymentDialogOpen(false)}
-          fees={selectedFeesData}
-          selectedFeeIds={selectedRows}
-          onPaymentsRecorded={handleBatchPaymentsRecorded}
-          getStudentName={getStudentName}
-        />
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this fee record and cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={handleDeleteFee}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}isOpen={isInvoiceModalOpen}
             onClose={() => setIsInvoiceModalOpen(false)}
             getStudentName={getStudentName}
           />

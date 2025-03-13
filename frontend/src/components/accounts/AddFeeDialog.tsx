@@ -256,7 +256,7 @@ export const AddFeeDialog = ({
       setError(null);
       
       // Map fee type to category name for consistency
-      const categoryMapping = {
+      const categoryMapping: {[key: string]: string} = {
         'tuition': 'Tuition',
         'transport': 'Transportation',
         'lab': 'Lab Fees',
