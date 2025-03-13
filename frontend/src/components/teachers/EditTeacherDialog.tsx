@@ -12,19 +12,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, UserPlus, AlertCircle } from 'lucide-react';
+import { Loader2, UserPlus, AlertCircle, Save } from 'lucide-react';
 
-interface AddTeacherDialogProps {
+interface EditTeacherDialogProps {
+  teacher: any;
   onClose: () => void;
-  onAdd: (teacherData: any) => Promise<void>;
+  onUpdate: (teacherData: any) => Promise<void>;
   error: string | null;
 }
 
-export const AddTeacherDialog = ({ onClose, onAdd, error }: AddTeacherDialogProps) => {
+export const EditTeacherDialog = ({ teacher, onClose, onUpdate, error }: EditTeacherDialogProps) => {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -45,6 +45,29 @@ export const AddTeacherDialog = ({ onClose, onAdd, error }: AddTeacherDialogProp
     'Nutrition and Health',
     'General Education'
   ];
+
+  // Initialize form with teacher data
+  useEffect(() => {
+    if (teacher) {
+      setFullName(teacher.user?.full_name || '');
+      setEmail(teacher.user?.email || '');
+      setUsername(teacher.user?.username || '');
+      
+      // Handle specialization
+      const teacherSpecialization = teacher.specialization || '';
+      if (specializations.includes(teacherSpecialization)) {
+        setSpecialization(teacherSpecialization);
+      } else if (teacherSpecialization) {
+        setSpecialization('custom');
+        setCustomSpecialization(teacherSpecialization);
+      } else {
+        setSpecialization('');
+      }
+      
+      setPhone(teacher.phone || '');
+      setAddress(teacher.address || '');
+    }
+  }, [teacher]);
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -71,14 +94,6 @@ export const AddTeacherDialog = ({ onClose, onAdd, error }: AddTeacherDialogProp
       isValid = false;
     }
 
-    if (!password.trim()) {
-      errors.password = 'Password is required';
-      isValid = false;
-    } else if (password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
-      isValid = false;
-    }
-
     // Check specialization, accounting for both dropdown and custom
     if (specialization !== 'custom' && !specialization.trim()) {
       errors.specialization = 'Specialization is required';
@@ -100,25 +115,23 @@ export const AddTeacherDialog = ({ onClose, onAdd, error }: AddTeacherDialogProp
     setLoading(true);
 
     try {
-      // Create teacher data object
-      const teacherData = {
-        full_name: fullName,
-        email,
-        username,
-        password,
+      // Create updated teacher data
+      const updatedTeacher = {
         specialization: specialization === 'custom' ? customSpecialization : specialization,
+        user: {
+          full_name: fullName,
+          email,
+          username,
+        },
         phone,
         address,
-        // Include customSpecialization to handle 'custom' selection
         customSpecialization
       };
 
-      console.log("Submitting teacher data:", teacherData);
+      console.log("Submitting updated teacher data:", updatedTeacher);
 
-      // Call the onAdd function passed from parent
-      await onAdd(teacherData);
-      
-      // Form reset happens in the parent component after successful submission
+      // Call the onUpdate function passed from parent
+      await onUpdate(updatedTeacher);
     } catch (err: any) {
       console.error('Error in form submission:', err);
       // Error is handled in the parent component
@@ -127,44 +140,13 @@ export const AddTeacherDialog = ({ onClose, onAdd, error }: AddTeacherDialogProp
     }
   };
 
-  // Auto-generate username from email
-  const generateUsername = (email: string) => {
-    if (!email) return '';
-    
-    // Take everything before the @ in the email
-    const emailPrefix = email.split('@')[0];
-    
-    // Remove special characters and spaces
-    return emailPrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-  };
-
-  // Handle email change and auto-generate username
-  const handleEmailChange = (value: string) => {
-    setEmail(value);
-    
-    // Only update username if it's currently empty or was auto-generated
-    if (!username || username === generateUsername(email)) {
-      setUsername(generateUsername(value));
-    }
-  };
-
-  // Generate random password
-  const generatePassword = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-    let result = '';
-    for (let i = 0; i < 10; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setPassword(result);
-  };
-
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add New Teacher</DialogTitle>
+          <DialogTitle>Edit Teacher</DialogTitle>
           <DialogDescription>
-            Create a new teacher account. The teacher will receive login credentials.
+            Edit teacher information for {teacher.user?.full_name || 'this teacher'}.
           </DialogDescription>
         </DialogHeader>
 
@@ -203,7 +185,7 @@ export const AddTeacherDialog = ({ onClose, onAdd, error }: AddTeacherDialogProp
                 id="email"
                 type="email"
                 value={email}
-                onChange={(e) => handleEmailChange(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="teacher@downtown.edu"
                 className={validationErrors.email ? 'border-red-500' : ''}
               />
@@ -228,41 +210,6 @@ export const AddTeacherDialog = ({ onClose, onAdd, error }: AddTeacherDialogProp
               {validationErrors.username && (
                 <p className="text-xs text-red-500">{validationErrors.username}</p>
               )}
-              <p className="text-xs text-gray-500">
-                Auto-generated from email, but can be changed
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="password" className="text-right">
-              Password <span className="text-red-500">*</span>
-            </Label>
-            <div className="col-span-3 space-y-1">
-              <div className="flex gap-2">
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className={validationErrors.password ? 'border-red-500' : ''}
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="sm"
-                  onClick={generatePassword}
-                >
-                  Generate
-                </Button>
-              </div>
-              {validationErrors.password && (
-                <p className="text-xs text-red-500">{validationErrors.password}</p>
-              )}
-              <p className="text-xs text-gray-500">
-                Must be at least 6 characters
-              </p>
             </div>
           </div>
 
@@ -348,12 +295,12 @@ export const AddTeacherDialog = ({ onClose, onAdd, error }: AddTeacherDialogProp
             {loading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
+                Saving...
               </>
             ) : (
               <>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Add Teacher
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
               </>
             )}
           </Button>
