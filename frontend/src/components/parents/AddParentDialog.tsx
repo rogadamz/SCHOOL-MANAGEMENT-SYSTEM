@@ -1,4 +1,3 @@
-// frontend/src/components/parents/AddParentDialog.tsx
 import { useState } from 'react';
 import {
   Dialog,
@@ -7,16 +6,16 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, UserPlus, AlertCircle } from 'lucide-react';
 
 interface AddParentDialogProps {
   onClose: () => void;
-  onAdd: (parent: any) => Promise<void>;
+  onAdd: (parentData: any) => Promise<void>;
   error: string | null;
 }
 
@@ -25,11 +24,12 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [address, setAddress] = useState('');
+  const [occupation, setOccupation] = useState('');
+  const [emergencyContact, setEmergencyContact] = useState('');
 
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
@@ -64,11 +64,6 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
       isValid = false;
     }
 
-    if (password !== confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
-      isValid = false;
-    }
-
     setValidationErrors(errors);
     return isValid;
   };
@@ -88,12 +83,14 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
         username,
         password,
         phone,
-        address
+        address,
+        occupation,
+        emergency_contact: emergencyContact
       };
 
       console.log("Submitting parent data:", parentData);
 
-      // Call the onAdd function passed from parent
+      // Call the onAdd function passed from parent component
       await onAdd(parentData);
       
       // Form reset happens in the parent component after successful submission
@@ -134,7 +131,6 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
       result += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setPassword(result);
-    setConfirmPassword(result);
   };
 
   return (
@@ -143,7 +139,7 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
         <DialogHeader>
           <DialogTitle>Add New Parent/Guardian</DialogTitle>
           <DialogDescription>
-            Create a new parent or guardian account.
+            Create a new parent/guardian account. They will receive login credentials.
           </DialogDescription>
         </DialogHeader>
 
@@ -156,15 +152,15 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
 
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="fullName" className="text-right">
+            <Label htmlFor="full-name" className="text-right">
               Full Name <span className="text-red-500">*</span>
             </Label>
             <div className="col-span-3 space-y-1">
               <Input
-                id="fullName"
+                id="full-name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="John Smith"
+                placeholder="John Doe"
                 className={validationErrors.fullName ? 'border-red-500' : ''}
               />
               {validationErrors.fullName && (
@@ -183,7 +179,7 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
                 type="email"
                 value={email}
                 onChange={(e) => handleEmailChange(e.target.value)}
-                placeholder="john.smith@example.com"
+                placeholder="parent@example.com"
                 className={validationErrors.email ? 'border-red-500' : ''}
               />
               {validationErrors.email && (
@@ -201,7 +197,7 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="jsmith"
+                placeholder="johndoe"
                 className={validationErrors.username ? 'border-red-500' : ''}
               />
               {validationErrors.username && (
@@ -246,25 +242,6 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="confirmPassword" className="text-right">
-              Confirm Password <span className="text-red-500">*</span>
-            </Label>
-            <div className="col-span-3 space-y-1">
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                className={validationErrors.confirmPassword ? 'border-red-500' : ''}
-              />
-              {validationErrors.confirmPassword && (
-                <p className="text-xs text-red-500">{validationErrors.confirmPassword}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="phone" className="text-right">
               Phone
             </Label>
@@ -273,7 +250,7 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="(555) 123-4567"
+                placeholder="+1 123-456-7890"
               />
             </div>
           </div>
@@ -287,7 +264,35 @@ export const AddParentDialog = ({ onClose, onAdd, error }: AddParentDialogProps)
                 id="address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="123 Main St, Downtown"
+                placeholder="123 Main St, Anytown"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="occupation" className="text-right">
+              Occupation
+            </Label>
+            <div className="col-span-3">
+              <Input
+                id="occupation"
+                value={occupation}
+                onChange={(e) => setOccupation(e.target.value)}
+                placeholder="Doctor, Engineer, etc."
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="emergency-contact" className="text-right">
+              Emergency Contact
+            </Label>
+            <div className="col-span-3">
+              <Input
+                id="emergency-contact"
+                value={emergencyContact}
+                onChange={(e) => setEmergencyContact(e.target.value)}
+                placeholder="+1 987-654-3210"
               />
             </div>
           </div>

@@ -1,4 +1,3 @@
-// frontend/src/components/parents/EditParentDialog.tsx
 import { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -29,6 +28,8 @@ export const EditParentDialog = ({ parent, onClose, onUpdate, error }: EditParen
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [occupation, setOccupation] = useState('');
+  const [emergencyContact, setEmergencyContact] = useState('');
 
   // Initialize form with parent data
   useEffect(() => {
@@ -38,6 +39,8 @@ export const EditParentDialog = ({ parent, onClose, onUpdate, error }: EditParen
       setUsername(parent.username || '');
       setPhone(parent.phone || '');
       setAddress(parent.address || '');
+      setOccupation(parent.occupation || '');
+      setEmergencyContact(parent.emergency_contact || '');
     }
   }, [parent]);
 
@@ -84,12 +87,14 @@ export const EditParentDialog = ({ parent, onClose, onUpdate, error }: EditParen
         email,
         username,
         phone,
-        address
+        address,
+        occupation,
+        emergency_contact: emergencyContact
       };
 
       console.log("Submitting updated parent data:", updatedParent);
 
-      // Call the onUpdate function passed from parent
+      // Call the onUpdate function passed from parent component
       await onUpdate(updatedParent);
     } catch (err: any) {
       console.error('Error in form submission:', err);
@@ -105,7 +110,7 @@ export const EditParentDialog = ({ parent, onClose, onUpdate, error }: EditParen
         <DialogHeader>
           <DialogTitle>Edit Parent/Guardian</DialogTitle>
           <DialogDescription>
-            Edit information for {parent.full_name || 'this guardian'}.
+            Edit information for {parent.full_name || 'this parent/guardian'}.
           </DialogDescription>
         </DialogHeader>
 
@@ -163,7 +168,7 @@ export const EditParentDialog = ({ parent, onClose, onUpdate, error }: EditParen
                 id="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="username"
+                placeholder="johndoe"
                 className={validationErrors.username ? 'border-red-500' : ''}
               />
               {validationErrors.username && (
@@ -195,7 +200,35 @@ export const EditParentDialog = ({ parent, onClose, onUpdate, error }: EditParen
                 id="address"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="123 Main St, Downtown"
+                placeholder="123 Main St, Anytown"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="occupation" className="text-right">
+              Occupation
+            </Label>
+            <div className="col-span-3">
+              <Input
+                id="occupation"
+                value={occupation}
+                onChange={(e) => setOccupation(e.target.value)}
+                placeholder="Doctor, Engineer, etc."
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="emergency-contact" className="text-right">
+              Emergency Contact
+            </Label>
+            <div className="col-span-3">
+              <Input
+                id="emergency-contact"
+                value={emergencyContact}
+                onChange={(e) => setEmergencyContact(e.target.value)}
+                placeholder="+1 987-654-3210"
               />
             </div>
           </div>

